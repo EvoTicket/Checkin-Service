@@ -42,8 +42,8 @@ Fields:
 | `current_owner_id` | Current owner user id projected from source-of-truth. |
 | `qr_version` | Version used to invalidate QR after resale/transfer. |
 | `access_status` | `VALID`, `LOCKED_RESALE`, `USED`, or `CANCELLED`. |
-| `allowed_gate_ids` | Optional simple gate allow-list for MVP, stored as text array or JSON. |
-| `gate_policy_snapshot` | Optional JSON policy snapshot if allow-list is not enough. |
+| `allowed_gate_ids` | Optional simple gate allow-list for MVP, stored as a JSON string in a text column. |
+| `gate_policy_snapshot` | Optional JSON policy snapshot string if allow-list is not enough. |
 | `used_at` | Server time when final check-in succeeded. |
 | `used_by_checker_id` | Checker id that completed final online/synced check-in. |
 | `used_at_gate_id` | Gate id used during final check-in. |
@@ -125,7 +125,7 @@ Fields:
 | `checker_id` | IAM user id for checker. |
 | `event_id` | Assigned event. |
 | `showtime_id` | Assigned showtime. |
-| `allowed_gate_ids` | Optional assigned gates. Empty means all/default gates for that assignment. |
+| `allowed_gate_ids` | Optional assigned gates as a JSON string. Empty means all/default gates for that assignment. |
 | `role_snapshot` | Role or assignment label, such as checker/supervisor. |
 | `valid_from` | Assignment start time. |
 | `valid_until` | Assignment end time. |
