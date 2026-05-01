@@ -65,6 +65,32 @@ Required cases:
 - Returned token envelope uses header/metadata, payload claims, and signature.
 - Raw secret seed is never returned.
 
+## Checker Assignment And Device Readiness Tests
+
+Endpoint targets:
+
+- `GET /api/v1/checker/assignments`
+- `POST /api/v1/checker/devices`
+- `GET /api/v1/checker/devices/{deviceId}/readiness`
+
+Required cases:
+
+- Current checker receives active, currently valid assignments only.
+- Inactive assignments are not returned.
+- Future or expired assignments are not returned.
+- Assignment validation passes for matching event, showtime, and allowed gate.
+- Assignment validation passes when allowed gate policy is empty.
+- Assignment validation rejects wrong event, wrong showtime, wrong gate, and missing gate when assignment is gate-specific.
+- Invalid checker scope returns `UNAUTHORIZED_CHECKER`.
+- `allowedGateIds` JSON array parsing handles values such as `["A1","A2"]`.
+- Device registration creates a new device with `trusted=true` for MVP local/demo flow.
+- Device registration updates existing device `lastSeenAt`.
+- Device registration binds device record to current checker.
+- Readiness returns registered, trusted, revoked, server time, checker id, and device id.
+- Readiness rejects a device owned by another checker.
+- Revoked device readiness returns `revoked=true`.
+- Device readiness does not attempt backend camera, browser, or network tests.
+
 ## Online Scan Tests
 
 Endpoint target: `POST /api/v1/checker/scan`.
@@ -200,6 +226,19 @@ Required cases:
 - Validation errors return structured error response.
 - Every scan API response includes stable `resultCode`.
 - HTTP status does not replace result code for business outcomes. For example, `ALREADY_USED` may be `200` with a non-success result code, while malformed requests may be `400`.
+
+## API Documentation Review Checklist
+
+Review this checklist for every task that creates or changes controllers:
+
+- Every controller has `@Tag` from `io.swagger.v3.oas.annotations.tags.Tag`.
+- Every endpoint has `@Operation` with a concise summary and business-oriented description.
+- Transport-level errors have `@ApiResponses` where appropriate, including 400, 401, 403, 404, and 500.
+- Business outcomes are represented by stable `resultCode` fields in the response body.
+- HTTP status represents request, transport, authentication, authorization, and system status.
+- Scan business-denied outcomes such as `ALREADY_USED`, `WRONG_GATE`, `QR_EXPIRED`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, and `CANCELLED` are not documented as HTTP-status-only outcomes.
+- No Swagger tag is created for an individual result state.
+- Tags remain grouped by business capability: `Buyer QR`, `Checker Assignments`, `Checker Scan`, `Offline Package`, `Offline Sync`, and `Checker Support`.
 
 ## Security and Privacy Tests
 

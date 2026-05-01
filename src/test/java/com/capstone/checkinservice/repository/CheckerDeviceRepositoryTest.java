@@ -35,6 +35,14 @@ class CheckerDeviceRepositoryTest {
     }
 
     @Test
+    void findByDeviceIdAndCheckerIdWorks() {
+        repository.saveAndFlush(device("device-abc", 7001L, true));
+
+        assertThat(repository.findByDeviceIdAndCheckerId("device-abc", 7001L)).isPresent();
+        assertThat(repository.findByDeviceIdAndCheckerId("device-abc", 7002L)).isEmpty();
+    }
+
+    @Test
     void findByCheckerIdWorks() {
         repository.saveAndFlush(device("device-abc", 7001L, true));
         repository.saveAndFlush(device("device-def", 7001L, false));

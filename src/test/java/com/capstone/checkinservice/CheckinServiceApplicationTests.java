@@ -1,7 +1,11 @@
 package com.capstone.checkinservice;
 
+import com.capstone.checkinservice.repository.CheckerAssignmentRepository;
+import com.capstone.checkinservice.repository.CheckerDeviceRepository;
+import com.capstone.checkinservice.repository.TicketAccessStateRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest(properties = {
         "DB_URL=jdbc:postgresql://localhost:5432/evoticket",
@@ -16,6 +20,14 @@ import org.springframework.boot.test.context.SpringBootTest;
                 + "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration"
 })
 class CheckinServiceApplicationTests {
+    @MockBean
+    private TicketAccessStateRepository ticketAccessStateRepository;
+
+    @MockBean
+    private CheckerAssignmentRepository checkerAssignmentRepository;
+
+    @MockBean
+    private CheckerDeviceRepository checkerDeviceRepository;
 
     @Test
     void contextLoads() {

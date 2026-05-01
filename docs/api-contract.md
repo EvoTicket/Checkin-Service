@@ -21,13 +21,53 @@ Authentication assumptions:
 - Support lookup requires checker/supervisor/support authorization as later finalized with IAM role names.
 - Internal projection/reconciliation endpoints, if later added, require internal-service authentication and are not part of this public contract.
 
+## Swagger Tag Convention
+
+Controllers must use `@Tag` from `io.swagger.v3.oas.annotations.tags.Tag`. Tags are grouped by business capability, not by individual result states. Do not create Swagger tags for `QR_EXPIRED`, `WRONG_GATE`, `ALREADY_USED`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, `CANCELLED`, or other scan result values.
+
+Planned controller tag mapping:
+
+| Controller | Tag name | Description |
+| --- | --- | --- |
+| `QrTokenController` | `Buyer QR` | APIs for issuing short-lived Dynamic QR tokens for ticket owners |
+| `CheckerAssignmentController` | `Checker Assignments` | APIs for retrieving checker event, showtime, gate, and shift assignments |
+| `CheckinScanController` | `Checker Scan` | APIs for online checker QR validation and atomic ticket check-in |
+| `OfflinePackageController` | `Offline Package` | APIs for generating scoped offline packages for checker devices |
+| `OfflineSyncController` | `Offline Sync` | APIs for synchronizing offline scans and classifying accepted, rejected, failed, and conflict results |
+| `SupportLookupController` | `Checker Support` | Support-only APIs for masked ticket ownership lookup and dispute context |
+
+Endpoint annotation conventions:
+
+- Each endpoint should use `@Operation` with a concise summary and business-oriented description.
+- Use `@ApiResponses` for transport-level errors such as 400, 401, 403, 404, and 500 where appropriate.
+- HTTP status represents request, transport, authentication, authorization, and system status.
+- Stable `resultCode` represents check-in business outcome.
+- Business scan outcomes such as `ALREADY_USED`, `WRONG_GATE`, `QR_EXPIRED`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, and `CANCELLED` should be represented by stable `resultCode` fields in the response body, not only by HTTP status.
+- The scan API may return HTTP 200 when a scan request is validly processed but denied by business rules.
+
+Example: HTTP 200 with a business-denied scan result.
+
+```json
+{
+  "status": 200,
+  "message": "Scan processed",
+  "data": {
+    "resultCode": "WRONG_GATE",
+    "ticketAssetId": 12345,
+    "eventId": 99,
+    "showtimeId": 501,
+    "gateId": "B1"
+  }
+}
+```
+
 ## QR Token Envelope
 
 The QR token is an envelope. The signature is not a field inside the payload.
 
 Header/metadata:
 
-- `alg`: signing algorithm, for example `ES256` or another approved asymmetric algorithm.
+- `alg`: signing algorithm. MVP uses `SHA256withECDSA`.
 - `kid`: key id used by the verifier.
 - `typ`: token type if applicable, for example `evoticket-qr`.
 
@@ -45,6 +85,7 @@ Payload claims:
 Signature:
 
 - Generated over header plus payload as part of the token envelope.
+- The MVP envelope is an EvoTicket QR token envelope, not strict JWS. ECDSA signature bytes are Java DER-encoded signature bytes.
 - Private signing key is never sent to clients or offline packages.
 - Offline packages may include public verification key material or key version metadata only.
 
@@ -70,6 +111,7 @@ Recommended QR TTL is 20 to 30 seconds. Recommended frontend refresh interval is
 | `SYNC_REJECTED` | Offline scan rejected by current business state. |
 | `SYNC_FAILED` | Retryable or technical sync failure. |
 | `SYNC_CONFLICT` | Offline local result conflicts with current server state. |
+| `OWNERSHIP_MISMATCH` | Current authenticated buyer is not the ticket owner. |
 | `UNAUTHORIZED_CHECKER` | Checker is not allowed for event/showtime/gate. |
 | `TICKET_NOT_FOUND` | Ticket projection was not found. |
 | `OFFLINE_PACKAGE_EXPIRED` | Offline package is expired. |
@@ -77,6 +119,8 @@ Recommended QR TTL is 20 to 30 seconds. Recommended frontend refresh interval is
 | `DEVICE_TIME_INVALID` | Device scan time is outside accepted tolerance. |
 
 ## GET /api/v1/tickets/{ticketAssetId}/qr-token
+
+Swagger tag: `Buyer QR`
 
 Purpose:
 
@@ -144,6 +188,7 @@ Failure example:
 Result codes:
 
 - `TICKET_NOT_FOUND`
+- `OWNERSHIP_MISMATCH`
 - `LOCKED_RESALE`
 - `CANCELLED`
 - `ALREADY_USED`
@@ -157,6 +202,8 @@ Business notes:
 - Do not send raw secret seed to the client.
 
 ## GET /api/v1/checker/assignments
+
+Swagger tag: `Checker Assignments`
 
 Purpose:
 
@@ -226,9 +273,144 @@ Result codes:
 Business notes:
 
 - Assignment validation is reused by online scan, offline package generation, and offline sync.
+- MVP returns active assignments that are currently valid based on `validFrom` and `validUntil`.
+- If `allowedGateIds` is absent or empty, later validation treats all/default gates as allowed.
+- If `allowedGateIds` is present, later validation requires the requested `gateId` to be included.
 - Exact IAM role names are still open.
 
+## POST /api/v1/checker/devices
+
+Swagger tag: `Checker Assignments`
+
+Purpose:
+
+- Register or update a checker device record for later offline package and sync workflows.
+
+Auth/role:
+
+- Authenticated checker role.
+- Checker id is resolved from the current user context.
+
+Request fields:
+
+- `deviceId`, required.
+- `deviceName`, optional.
+- `platform`, optional.
+
+Request example:
+
+```json
+{
+  "deviceId": "device-abc",
+  "deviceName": "Gate phone",
+  "platform": "WEB"
+}
+```
+
+Response fields:
+
+- `deviceId`
+- `checkerId`
+- `deviceName`
+- `platform`
+- `trusted`
+- `revokedAt`
+- `lastSeenAt`
+
+Success example:
+
+```json
+{
+  "status": 200,
+  "message": "Checker device registered successfully",
+  "data": {
+    "deviceId": "device-abc",
+    "checkerId": 7001,
+    "deviceName": "Gate phone",
+    "platform": "WEB",
+    "trusted": true,
+    "revokedAt": null,
+    "lastSeenAt": "2026-05-01T10:00:00Z"
+  }
+}
+```
+
+Business notes:
+
+- MVP defaults newly registered checker devices to `trusted=true` for local/demo readiness.
+- Existing device records are rebound to the current checker on registration and `lastSeenAt` is updated.
+- This endpoint does not issue offline packages and does not perform admission logic.
+
+## GET /api/v1/checker/devices/{deviceId}/readiness
+
+Swagger tag: `Checker Assignments`
+
+Purpose:
+
+- Return server-known checker device readiness metadata for the checker UI.
+
+Auth/role:
+
+- Authenticated checker role.
+- Device must belong to the authenticated checker if it already exists.
+
+Path fields:
+
+- `deviceId`
+
+Response fields:
+
+- `deviceId`
+- `checkerId`
+- `registered`
+- `trusted`
+- `revoked`
+- `serverTime`
+- `message`
+
+Success example:
+
+```json
+{
+  "status": 200,
+  "message": "Fetched checker device readiness successfully",
+  "data": {
+    "deviceId": "device-abc",
+    "checkerId": 7001,
+    "registered": true,
+    "trusted": true,
+    "revoked": false,
+    "serverTime": "2026-05-01T10:00:00Z",
+    "message": "Device is ready."
+  }
+}
+```
+
+Failure example:
+
+```json
+{
+  "status": 403,
+  "message": "Device is registered to another checker",
+  "data": {
+    "resultCode": "UNAUTHORIZED_CHECKER"
+  }
+}
+```
+
+Result codes:
+
+- `UNAUTHORIZED_CHECKER`
+
+Business notes:
+
+- Backend readiness only reports server-known facts: registered, trusted, revoked, checker id, device id, and server time.
+- Camera permission, network strength, browser capability, and local clock UI checks remain frontend responsibilities.
+- This endpoint does not issue offline packages and does not perform admission logic.
+
 ## POST /api/v1/checker/scan
+
+Swagger tag: `Checker Scan`
 
 Purpose:
 
@@ -337,6 +519,8 @@ Business notes:
 
 ## POST /api/v1/checker/offline-packages
 
+Swagger tag: `Offline Package`
+
 Purpose:
 
 - Generate a scoped offline package for a checker device.
@@ -443,6 +627,8 @@ Business notes:
 - Offline package does not mark tickets used on the server.
 
 ## POST /api/v1/checker/offline-sync
+
+Swagger tag: `Offline Sync`
 
 Purpose:
 
@@ -572,6 +758,8 @@ Business notes:
 - Each sync item should write or update an `offline_sync_item` record and a `CheckInLog` entry where appropriate.
 
 ## GET /api/v1/checker/tickets/{ticketAssetId}/owner-info
+
+Swagger tag: `Checker Support`
 
 Purpose:
 

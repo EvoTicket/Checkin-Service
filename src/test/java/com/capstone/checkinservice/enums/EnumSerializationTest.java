@@ -31,6 +31,7 @@ class EnumSerializationTest {
                         "SYNC_REJECTED",
                         "SYNC_FAILED",
                         "SYNC_CONFLICT",
+                        "OWNERSHIP_MISMATCH",
                         "UNAUTHORIZED_CHECKER",
                         "TICKET_NOT_FOUND",
                         "OFFLINE_PACKAGE_EXPIRED",

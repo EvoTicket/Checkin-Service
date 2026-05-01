@@ -153,6 +153,14 @@ public final class ScanResultMessageMapper {
                     false,
                     true
             );
+            case OWNERSHIP_MISMATCH -> message(
+                    result,
+                    "Ticket not available",
+                    "This ticket is not owned by the authenticated user.",
+                    ERROR,
+                    false,
+                    false
+            );
             case UNAUTHORIZED_CHECKER -> message(
                     result,
                     "Unauthorized checker",

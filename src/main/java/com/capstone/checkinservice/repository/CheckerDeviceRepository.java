@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface CheckerDeviceRepository extends JpaRepository<CheckerDevice, Long> {
     Optional<CheckerDevice> findByDeviceId(String deviceId);
 
+    Optional<CheckerDevice> findByDeviceIdAndCheckerId(String deviceId, Long checkerId);
+
     List<CheckerDevice> findByCheckerId(Long checkerId);
 
     List<CheckerDevice> findByCheckerIdAndTrustedTrue(Long checkerId);

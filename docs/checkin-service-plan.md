@@ -191,6 +191,37 @@ Support/owner info responses should:
 - Preserve stable result codes.
 - Separate operational scan state from provenance history.
 
+## OpenAPI / Swagger Convention
+
+Future controller work must use Springdoc/OpenAPI annotations consistently when Springdoc is enabled.
+
+Controller tags must be grouped by business capability, not by individual scan result. Do not create Swagger tags for result states such as `QR_EXPIRED`, `WRONG_GATE`, `ALREADY_USED`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, or `CANCELLED`.
+
+Planned controller tag mapping:
+
+| Controller | Tag name | Description |
+| --- | --- | --- |
+| `QrTokenController` | `Buyer QR` | APIs for issuing short-lived Dynamic QR tokens for ticket owners |
+| `CheckerAssignmentController` | `Checker Assignments` | APIs for retrieving checker event, showtime, gate, and shift assignments |
+| `CheckinScanController` | `Checker Scan` | APIs for online checker QR validation and atomic ticket check-in |
+| `OfflinePackageController` | `Offline Package` | APIs for generating scoped offline packages for checker devices |
+| `OfflineSyncController` | `Offline Sync` | APIs for synchronizing offline scans and classifying accepted, rejected, failed, and conflict results |
+| `SupportLookupController` | `Checker Support` | Support-only APIs for masked ticket ownership lookup and dispute context |
+
+Controller conventions:
+
+- Each controller must use `@Tag` from `io.swagger.v3.oas.annotations.tags.Tag`.
+- Each endpoint should use `@Operation` with a concise summary and business-oriented description.
+- Use `@ApiResponses` for transport-level errors such as 400, 401, 403, 404, and 500 where appropriate.
+- HTTP status represents request, transport, authentication, authorization, and system status.
+- Stable `resultCode` fields represent check-in business outcomes.
+- Business-denied scan outcomes such as `ALREADY_USED`, `WRONG_GATE`, `QR_EXPIRED`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, and `CANCELLED` must be represented by response body `resultCode`, not only by HTTP status.
+- The scan API may return HTTP 200 for a successfully processed scan that is denied by business rules.
+
+Any future implementation task that creates or modifies controllers must include this Definition of Done item:
+
+- Controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
+
 ## Implementation Phases
 
 ### Task 0 - Foundation planning and docs
@@ -262,7 +293,7 @@ Support/owner info responses should:
 - Tables affected: read `ticket_access_state`.
 - Tests: owner success, non-owner rejected, `USED`, `LOCKED_RESALE`, `CANCELLED`, token verifies.
 - Risks: issuing QR for stale owner after resale/transfer.
-- Definition of done: active QR only issued to current owner for valid ticket state.
+- Definition of done: active QR only issued to current owner for valid ticket state; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: buyer offline QR batch.
 
 ### Task 6 - Checker assignment and device readiness APIs
@@ -274,7 +305,7 @@ Support/owner info responses should:
 - Tables affected: `checker_assignment`, `checker_device`.
 - Tests: assigned checker sees scoped assignments; unassigned checker gets none or forbidden for scan scope.
 - Risks: unclear IAM role names.
-- Definition of done: assignment checks can be reused by online scan and offline package generation.
+- Definition of done: assignment checks can be reused by online scan and offline package generation; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: scan validation.
 
 ### Task 7 - Online scan validation and atomic check-in
@@ -286,7 +317,7 @@ Support/owner info responses should:
 - Tables affected: `ticket_access_state`, `check_in_log`.
 - Tests: valid scan, second scan, expired QR, invalid signature, wrong event/showtime/gate, invalid version, locked resale, cancelled, concurrent double scan.
 - Risks: race condition allowing duplicate check-in.
-- Definition of done: only one concurrent scan succeeds and every scan writes the appropriate log.
+- Definition of done: only one concurrent scan succeeds and every scan writes the appropriate log; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: offline sync or override.
 
 ### Task 8 - Offline package generation
@@ -298,7 +329,7 @@ Support/owner info responses should:
 - Tables affected: `offline_package`, read `ticket_access_state`.
 - Tests: scope enforcement, package expiry, no private secrets, package signature.
 - Risks: over-broad package or PII leakage.
-- Definition of done: package contains only assigned scope and safe verification material.
+- Definition of done: package contains only assigned scope and safe verification material; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: buyer offline QR or offline sync.
 
 ### Task 9 - Offline sync, rejected, failed, and conflict handling
@@ -310,7 +341,7 @@ Support/owner info responses should:
 - Tables affected: `ticket_access_state`, `check_in_log`, `offline_sync_item`.
 - Tests: accepted, already-used conflict, cancelled rejected, locked resale rejected, malformed failed, summary counts.
 - Risks: checking QR expiration against current time instead of `scannedAt`.
-- Definition of done: every item receives `SYNC_ACCEPTED`, `SYNC_REJECTED`, `SYNC_FAILED`, or `SYNC_CONFLICT`.
+- Definition of done: every item receives `SYNC_ACCEPTED`, `SYNC_REJECTED`, `SYNC_FAILED`, or `SYNC_CONFLICT`; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: checker conflict override.
 
 ### Task 10 - Support lookup and owner info
@@ -322,7 +353,7 @@ Support/owner info responses should:
 - Tables affected: read `ticket_access_state`, optionally `check_in_log`.
 - Tests: PII masked, unauthorized access denied, no override action.
 - Risks: leaking full email/phone or turning lookup into manual admission.
-- Definition of done: response explains state without exposing sensitive data.
+- Definition of done: response explains state without exposing sensitive data; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: manual check-in.
 
 ### Task 11 - Api-Gateway integration plan
