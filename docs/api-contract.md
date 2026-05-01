@@ -91,6 +91,40 @@ Signature:
 
 Recommended QR TTL is 20 to 30 seconds. Recommended frontend refresh interval is 15 to 20 seconds.
 
+## QR Key Deployment
+
+Checkin-Service requires deployment-provided EC key material for QR signing. The application reads these environment variables at startup:
+
+- `QR_KEY_ID`
+- `QR_PRIVATE_KEY_BASE64`
+- `QR_PUBLIC_KEY_BASE64`
+
+`QR_PRIVATE_KEY_BASE64` must be a Base64-encoded PKCS8 EC private key. `QR_PUBLIC_KEY_BASE64` must be a Base64-encoded X509 EC public key. Startup must fail if any value is missing, blank, or invalid.
+
+Local PowerShell example:
+
+```powershell
+$env:QR_KEY_ID="qr-key-local-v1"
+$env:QR_PRIVATE_KEY_BASE64="<generated-private-key>"
+$env:QR_PUBLIC_KEY_BASE64="<generated-public-key>"
+.\gradlew.bat bootRun
+```
+
+Generate local key material with:
+
+```powershell
+javac .\tools\GenerateQrKeyPair.java
+java -cp .\tools GenerateQrKeyPair
+```
+
+Production rules:
+
+- Provide QR environment variables through server environment, Docker secret, CI/CD secret, or a platform secret manager.
+- Do not commit the private key.
+- Do not bake the private key into a Docker image.
+- All Checkin-Service instances must use the same active QR key set.
+- Rotate keys using a future `keyId`/`kid` strategy.
+
 ## Stable Result Codes
 
 | Result code | UI meaning |

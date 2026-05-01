@@ -1,7 +1,7 @@
 package com.capstone.checkinservice.service;
 
 import com.capstone.checkinservice.config.OfflinePackageProperties;
-import com.capstone.checkinservice.crypto.key.DevelopmentQrKeyProvider;
+import com.capstone.checkinservice.crypto.key.TestQrKeyProvider;
 import com.capstone.checkinservice.dto.request.OfflinePackageRequest;
 import com.capstone.checkinservice.dto.response.OfflinePackageResponse;
 import com.capstone.checkinservice.entity.OfflinePackage;
@@ -69,7 +69,7 @@ class OfflinePackageServiceTest {
                 checkerAssignmentService,
                 checkerDeviceValidationService,
                 currentUserProvider,
-                new DevelopmentQrKeyProvider("local-dev-key-v1"),
+                TestQrKeyProvider.single("local-dev-key-v1"),
                 properties,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
                 Clock.fixed(NOW, ZoneOffset.UTC)

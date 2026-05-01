@@ -3,7 +3,6 @@ package com.capstone.checkinservice.config;
 import com.capstone.checkinservice.crypto.QrTokenProperties;
 import com.capstone.checkinservice.crypto.QrTokenSigner;
 import com.capstone.checkinservice.crypto.QrTokenVerifier;
-import com.capstone.checkinservice.crypto.key.DevelopmentQrKeyProvider;
 import com.capstone.checkinservice.crypto.key.QrKeyProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,11 +14,6 @@ public class QrCryptoConfig {
     @Bean
     public QrTokenProperties qrTokenProperties() {
         return new QrTokenProperties();
-    }
-
-    @Bean
-    public QrKeyProvider qrKeyProvider() {
-        return new DevelopmentQrKeyProvider("local-dev-qr-key");
     }
 
     @Bean
