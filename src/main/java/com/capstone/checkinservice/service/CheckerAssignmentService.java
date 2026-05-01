@@ -62,12 +62,35 @@ public class CheckerAssignmentService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isCheckerAssignedToShowtime(Long checkerId, Long eventId, Long showtimeId) {
+        if (checkerId == null || eventId == null || showtimeId == null) {
+            return false;
+        }
+
+        return checkerAssignmentRepository
+                .findByCheckerIdAndEventIdAndShowtimeIdAndActiveTrue(checkerId, eventId, showtimeId)
+                .stream()
+                .anyMatch(this::isCurrentlyValid);
+    }
+
+    @Transactional(readOnly = true)
     public void assertCheckerAssigned(Long checkerId, Long eventId, Long showtimeId, String gateId) {
         if (!isCheckerAssigned(checkerId, eventId, showtimeId, gateId)) {
             throw new CheckinBusinessException(
                     ScanResult.UNAUTHORIZED_CHECKER,
                     HttpStatus.FORBIDDEN,
                     "Checker is not authorized for this event, showtime, or gate"
+            );
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void assertCheckerAssignedToShowtime(Long checkerId, Long eventId, Long showtimeId) {
+        if (!isCheckerAssignedToShowtime(checkerId, eventId, showtimeId)) {
+            throw new CheckinBusinessException(
+                    ScanResult.UNAUTHORIZED_CHECKER,
+                    HttpStatus.FORBIDDEN,
+                    "Checker is not authorized for this event or showtime"
             );
         }
     }

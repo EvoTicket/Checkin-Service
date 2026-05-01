@@ -371,6 +371,7 @@ Any future implementation task that creates or modifies controllers must include
 ### Task 10 - Support lookup and owner info
 
 - Goal: provide read-only diagnostic owner/ticket context.
+- Status: implemented.
 - Scope: masked owner info and support-oriented ticket state.
 - Files: owner-info controller/service/DTOs/tests.
 - APIs affected: `GET /api/v1/checker/tickets/{ticketAssetId}/owner-info`.

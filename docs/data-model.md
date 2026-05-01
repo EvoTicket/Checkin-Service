@@ -370,6 +370,7 @@ Rules:
 - Operational audit for scans, check-ins, offline local results, sync processing, and conflicts.
 - Used by gate operations, support, incident review, and scan troubleshooting.
 - Stores `qr_token_id`/`jti`, not raw QR token.
+- Task 10 owner-info reads recent `CheckInLog` rows for a ticket and returns only safe support fields: scan mode, scan result, scanned/synced timestamps, gate id, checker id, device id, failure reason, and conflict status. It does not return `qr_token_id`.
 
 `TicketProvenance`:
 
@@ -381,6 +382,9 @@ Rules:
 ## Data Privacy Notes
 
 - Support owner info must mask PII.
+- Task 10 owner-info returns `supportOnly=true`, `canOverride=false`, and no state-changing action.
+- Task 10 owner-info uses `ticket_access_state.current_owner_id` as a masked owner reference when no IAM/user profile adapter is available.
+- If a future IAM/user profile adapter supplies owner display name, email, or phone, those values must be masked before they leave Checkin-Service.
 - Offline packages must not include full email, full phone, payment data, or unnecessary user profile data.
 - Store `jti`/`qr_token_id`, not raw QR token.
 - Store public verification key or key version, never private signing key.

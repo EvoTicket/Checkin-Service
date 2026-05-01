@@ -949,6 +949,8 @@ Business notes:
 
 Swagger tag: `Checker Support`
 
+Implementation status: implemented in Task 10.
+
 Purpose:
 
 - Provide support/checker diagnostic owner and ticket context without enabling manual admission.
@@ -956,6 +958,8 @@ Purpose:
 Auth/role:
 
 - Authenticated checker assigned to the event/showtime or support/supervisor role.
+- Current MVP implementation uses `CurrentUserProvider` and permits checker access when the checker has an active assignment for the ticket `eventId` and `showtimeId`. Gate-specific assignment is not required for owner-info because the response is read-only support context.
+- Broader support/supervisor role handling is deferred until IAM role integration is finalized.
 
 Path fields:
 
@@ -963,20 +967,46 @@ Path fields:
 
 Response fields:
 
-- `ticketAssetId`
-- `ticketCode`
-- `eventId`
-- `showtimeId`
-- `ticketTypeName`
-- `zoneLabel`
-- `seatLabel`
-- `accessStatus`
-- `maskedOwnerName`
-- `maskedOwnerEmail`
-- `maskedOwnerPhone`
-- `lastScanResult`
-- `usedAt`
-- `usedAtGateId`
+- `supportOnly`, always `true`
+- `canOverride`, always `false`
+- `allowedActions`, currently `CALL_SUPPORT`, `DIRECT_TO_ALLOWED_GATE`, and/or `BACK_TO_SCAN`
+- `ticket`
+- `ticket.ticketAssetId`
+- `ticket.ticketCode`
+- `ticket.eventId`
+- `ticket.showtimeId`
+- `ticket.ticketTypeName`
+- `ticket.zoneLabel`
+- `ticket.seatLabel`
+- `ticket.accessStatus`
+- `ticket.qrVersion`
+- `ticket.allowedGateIds`
+- `currentOwner`
+- `currentOwner.ownerId`, masked owner reference such as `usr_****1234`
+- `currentOwner.displayName`, masked when profile data is available
+- `currentOwner.maskedEmail`, masked when profile data is available
+- `currentOwner.maskedPhone`, masked when profile data is available
+- `currentOwner.effectiveFrom`, best-effort projection update timestamp
+- `latestSuccessfulCheckIn`
+- `latestSuccessfulCheckIn.usedAt`
+- `latestSuccessfulCheckIn.usedAtGateId`
+- `latestSuccessfulCheckIn.usedByCheckerId`
+- `latestSuccessfulCheckIn.deviceId`
+- `recentScanAttempts[]`, last 10 logs sorted by `scannedAt` descending
+- `recentScanAttempts.scanMode`
+- `recentScanAttempts.scanResult`
+- `recentScanAttempts.scannedAt`
+- `recentScanAttempts.syncedAt`
+- `recentScanAttempts.gateId`
+- `recentScanAttempts.checkerId`
+- `recentScanAttempts.deviceId`
+- `recentScanAttempts.failureReason`
+- `recentScanAttempts.conflictStatus`
+- `offlineSyncContexts[]`, latest offline sync rows when available
+- `supportContext.reason`
+- `supportContext.message`
+- `supportContext.recommendedAction`
+- Backward-compatible flat fields are also returned: `ticketAssetId`, `ticketCode`, `eventId`, `showtimeId`, `ticketTypeName`, `zoneLabel`, `seatLabel`, `accessStatus`, `maskedOwnerName`, `maskedOwnerEmail`, `maskedOwnerPhone`, `lastScanResult`, `usedAt`, and `usedAtGateId`.
 
 Success example:
 
@@ -985,20 +1015,51 @@ Success example:
   "status": 200,
   "message": "Fetched ticket owner info successfully",
   "data": {
-    "ticketAssetId": 12345,
-    "ticketCode": "TCK-001",
-    "eventId": 99,
-    "showtimeId": 501,
-    "ticketTypeName": "VIP",
-    "zoneLabel": "Zone A",
-    "seatLabel": "A-12",
-    "accessStatus": "USED",
-    "maskedOwnerName": "N*** V*** A",
-    "maskedOwnerEmail": "n***@example.com",
-    "maskedOwnerPhone": "******7890",
-    "lastScanResult": "ALREADY_USED",
-    "usedAt": "2026-05-01T09:05:00Z",
-    "usedAtGateId": "A2"
+    "supportOnly": true,
+    "canOverride": false,
+    "allowedActions": ["CALL_SUPPORT", "BACK_TO_SCAN"],
+    "ticket": {
+      "ticketAssetId": 12345,
+      "ticketCode": "TCK-001",
+      "eventId": 99,
+      "showtimeId": 501,
+      "ticketTypeName": "VIP",
+      "zoneLabel": "Zone A",
+      "seatLabel": "A-12",
+      "accessStatus": "USED",
+      "qrVersion": 3,
+      "allowedGateIds": ["A1", "A2"]
+    },
+    "currentOwner": {
+      "ownerId": "usr_****0010",
+      "displayName": null,
+      "maskedEmail": null,
+      "maskedPhone": null,
+      "effectiveFrom": "2026-05-01T18:57:00Z"
+    },
+    "latestSuccessfulCheckIn": {
+      "usedAt": "2026-05-01T09:05:00Z",
+      "usedAtGateId": "A2",
+      "usedByCheckerId": 7002,
+      "deviceId": "device-a"
+    },
+    "recentScanAttempts": [
+      {
+        "scanResult": "ALREADY_USED",
+        "scanMode": "ONLINE",
+        "scannedAt": "2026-05-01T09:06:00Z",
+        "gateId": "A1",
+        "checkerId": 7001,
+        "deviceId": "device-b",
+        "failureReason": "TICKET_STATE_INVALID",
+        "conflictStatus": "NONE"
+      }
+    ],
+    "supportContext": {
+      "reason": "ALREADY_USED",
+      "message": "Ve da duoc ghi nhan check-in truoc do.",
+      "recommendedAction": "CALL_SUPPORT"
+    }
   }
 }
 ```
@@ -1025,3 +1086,14 @@ Business notes:
 - PII must be masked.
 - Response is for support lookup only.
 - Manual lookup must not imply direct admission or override.
+- The response never includes raw QR tokens, private keys, JWT/internal secrets, or payment details.
+- Checkin-Service currently has no IAM/user profile client. The production implementation therefore returns a masked owner reference from `currentOwnerId`. If a future IAM adapter supplies owner display name, email, or phone, those values must be masked by the support masking utility before returning.
+- Email masking keeps only a safe local-part prefix and the domain, for example `han.***@gmail.com`.
+- Phone masking keeps the first two and last two digits for long phone numbers, for example `09******28`.
+- Support context mapping is deterministic:
+  - `SYNC_CONFLICT` log or sync item -> `SYNC_CONFLICT`, `CALL_SUPPORT`
+  - `USED` ticket -> `ALREADY_USED`, `CALL_SUPPORT`
+  - `LOCKED_RESALE` ticket -> `LOCKED_RESALE`, `CALL_SUPPORT`
+  - `CANCELLED` ticket -> `CANCELLED`, `CALL_SUPPORT`
+  - Latest `WRONG_GATE` log -> `WRONG_GATE`, `DIRECT_TO_ALLOWED_GATE`
+- Optional free-form support lookup by `ticketCode`, `orderCode`, or `assetCode` is deferred as a future extension. Task 10 implements only `GET /api/v1/checker/tickets/{ticketAssetId}/owner-info`.

@@ -14,6 +14,8 @@ public interface OfflineSyncItemRepository extends JpaRepository<OfflineSyncItem
 
     List<OfflineSyncItem> findByTicketAssetId(Long ticketAssetId);
 
+    List<OfflineSyncItem> findByTicketAssetIdOrderBySyncedAtDesc(Long ticketAssetId);
+
     List<OfflineSyncItem> findBySyncResult(SyncResult syncResult);
 
     List<OfflineSyncItem> findByCheckerIdAndDeviceId(Long checkerId, String deviceId);

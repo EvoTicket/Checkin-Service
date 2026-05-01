@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface CheckInLogRepository extends JpaRepository<CheckInLog, Long> {
     List<CheckInLog> findByTicketAssetIdOrderByScannedAtDesc(Long ticketAssetId);
 
+    List<CheckInLog> findTop10ByTicketAssetIdOrderByScannedAtDesc(Long ticketAssetId);
+
     Optional<CheckInLog> findFirstByTicketAssetIdAndScanResultOrderByScannedAtAsc(
             Long ticketAssetId,
             ScanResult scanResult

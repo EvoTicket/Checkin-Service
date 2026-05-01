@@ -276,6 +276,30 @@ Required cases:
 - Every scan API response includes stable `resultCode`.
 - HTTP status does not replace result code for business outcomes. For example, `ALREADY_USED` may be `200` with a non-success result code, while malformed requests may be `400`.
 
+## Support Lookup Tests
+
+Endpoint target: `GET /api/v1/checker/tickets/{ticketAssetId}/owner-info`.
+
+Task 10 coverage status: implemented with masking unit tests, support lookup service tests, and controller envelope tests.
+
+Required cases:
+
+- Owner-info returns ticket summary for an assigned checker.
+- Owner-info rejects an unassigned checker with `UNAUTHORIZED_CHECKER`.
+- Owner-info returns `supportOnly=true`.
+- Owner-info returns `canOverride=false`.
+- Owner-info masks email when profile data is available.
+- Owner-info masks phone when profile data is available.
+- Owner-info returns a masked owner reference when Checkin-Service has no local owner profile.
+- Owner-info does not expose raw QR token, private key, JWT/internal secret, or payment details.
+- Owner-info includes latest successful check-in context when ticket is `USED`.
+- Owner-info includes recent scan attempts.
+- Owner-info maps `USED` to `ALREADY_USED` support context.
+- Owner-info maps `LOCKED_RESALE` support context.
+- Owner-info maps `CANCELLED` support context.
+- Owner-info maps `SYNC_CONFLICT` support context when a conflict log or offline sync item exists.
+- Optional lookup by `ticketCode` is not implemented in Task 10 and remains a future extension.
+
 ## API Documentation Review Checklist
 
 Review this checklist for every task that creates or changes controllers:
