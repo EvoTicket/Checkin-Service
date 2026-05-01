@@ -59,6 +59,19 @@ class TicketAccessStateRepositoryTest {
     }
 
     @Test
+    void findByEventIdAndShowtimeIdReturnsAllStatusesForOfflinePackage() {
+        repository.saveAndFlush(validTicket(1001L, 10L, 99L, 501L));
+        repository.saveAndFlush(validTicket(1002L, 20L, 99L, 501L, TicketAccessStatus.USED));
+        repository.saveAndFlush(validTicket(1003L, 30L, 99L, 501L, TicketAccessStatus.LOCKED_RESALE));
+        repository.saveAndFlush(validTicket(1004L, 40L, 100L, 501L));
+        repository.saveAndFlush(validTicket(1005L, 50L, 99L, 502L));
+
+        assertThat(repository.findByEventIdAndShowtimeId(99L, 501L))
+                .extracting(TicketAccessState::getTicketAssetId)
+                .containsExactlyInAnyOrder(1001L, 1002L, 1003L);
+    }
+
+    @Test
     void markUsedIfValidSucceedsOnceForValidTicket() {
         repository.saveAndFlush(validTicket(1001L, 10L, 99L, 501L));
         Instant usedAt = Instant.parse("2026-05-01T10:00:00Z");

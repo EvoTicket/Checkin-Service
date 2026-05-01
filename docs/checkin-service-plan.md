@@ -156,6 +156,18 @@ The package contains package identity, validity window, verification key metadat
 
 Offline acceptance is provisional and must be represented as `OFFLINE_ACCEPTED_PENDING_SYNC`.
 
+### Checker Device Management
+
+Checker identity and checker device trust are separate controls. JWT/current user identity answers who the checker is. The server-side `checker_device` record answers which checker client installation is being used and whether it is allowed to perform sensitive checker flows.
+
+Device lifecycle:
+
+- `PENDING`: device is registered but not trusted. It cannot download offline packages.
+- `TRUSTED`: device is trusted and not revoked. It can download offline packages and can be used for strict checker flows.
+- `REVOKED`: device is blocked from offline package generation and from checker-sensitive operations when device validation is enabled.
+
+Device id is an identifier, not proof by itself. The trusted server-side record is the source of permission. Public checker APIs do not allow self-trust; trust/revoke is a future admin/organizer/internal workflow, with service methods available for seed/test/admin use.
+
 ### Offline Sync
 
 When network is restored, the checker frontend sends pending offline scans to `POST /api/v1/checker/offline-sync`.
@@ -311,6 +323,7 @@ Any future implementation task that creates or modifies controllers must include
 ### Task 7 - Online scan validation and atomic check-in
 
 - Goal: implement online-first checker scan.
+- Status: implemented.
 - Scope: full validation chain and atomic `VALID` to `USED` update.
 - Files: scan controller/service, repositories, log writing, tests.
 - APIs affected: `POST /api/v1/checker/scan`.
@@ -323,6 +336,7 @@ Any future implementation task that creates or modifies controllers must include
 ### Task 8 - Offline package generation
 
 - Goal: generate scoped offline packages for checker devices.
+- Status: implemented.
 - Scope: package creation, ticket snapshot filtering, checksum, package signature, public verification key metadata.
 - Files: offline package controller/service/entities/tests.
 - APIs affected: `POST /api/v1/checker/offline-packages`.
@@ -331,6 +345,15 @@ Any future implementation task that creates or modifies controllers must include
 - Risks: over-broad package or PII leakage.
 - Definition of done: package contains only assigned scope and safe verification material; controller endpoints are documented with `@Tag`, `@Operation`, and transport-level `@ApiResponses` where appropriate.
 - Must not implement: buyer offline QR or offline sync.
+
+### Task 8.5 - Device management and Task 7/8 hardening
+
+- Goal: require registered/trusted checker devices for offline packages and harden online scan/package validation before offline sync.
+- Status: implemented.
+- Scope: device lifecycle APIs, trusted-device validation, QR issuedAt future validation, scan `scannedAt` skew validation, malformed gate policy fail-closed behavior, offline package key metadata and safe snapshots.
+- APIs affected: `POST /api/v1/checker/devices/register`, `GET /api/v1/checker/devices/{deviceId}`, `POST /api/v1/checker/scan`, `POST /api/v1/checker/offline-packages`.
+- Tables affected: `checker_device`, `offline_package`, read `ticket_access_state`.
+- Must not implement: offline sync, conflict handling, support lookup, manual check-in.
 
 ### Task 9 - Offline sync, rejected, failed, and conflict handling
 

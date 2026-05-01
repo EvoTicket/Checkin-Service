@@ -65,12 +65,13 @@ Required cases:
 - Returned token envelope uses header/metadata, payload claims, and signature.
 - Raw secret seed is never returned.
 
-## Checker Assignment And Device Readiness Tests
+## Checker Assignment And Device Management Tests
 
 Endpoint targets:
 
 - `GET /api/v1/checker/assignments`
-- `POST /api/v1/checker/devices`
+- `POST /api/v1/checker/devices/register`
+- `GET /api/v1/checker/devices/{deviceId}`
 - `GET /api/v1/checker/devices/{deviceId}/readiness`
 
 Required cases:
@@ -83,9 +84,14 @@ Required cases:
 - Assignment validation rejects wrong event, wrong showtime, wrong gate, and missing gate when assignment is gate-specific.
 - Invalid checker scope returns `UNAUTHORIZED_CHECKER`.
 - `allowedGateIds` JSON array parsing handles values such as `["A1","A2"]`.
-- Device registration creates a new device with `trusted=true` for MVP local/demo flow.
-- Device registration updates existing device `lastSeenAt`.
-- Device registration binds device record to current checker.
+- Device registration creates a new device with server-generated `deviceId`.
+- Device registration creates `PENDING`/`trusted=false` devices by default.
+- Device registration does not accept client-provided device id as trust proof.
+- Device status works for owner checker.
+- Another checker's device is rejected.
+- Trusted device is accepted by validation service.
+- Revoked device is rejected by validation service.
+- Untrusted/PENDING device is rejected by validation service.
 - Readiness returns registered, trusted, revoked, server time, checker id, and device id.
 - Readiness rejects a device owned by another checker.
 - Revoked device readiness returns `revoked=true`.
@@ -94,6 +100,8 @@ Required cases:
 ## Online Scan Tests
 
 Endpoint target: `POST /api/v1/checker/scan`.
+
+Task 7 coverage status: implemented with service unit tests, controller envelope tests, existing repository conditional-update tests, and a lightweight concurrent double-scan service test.
 
 Required cases:
 
@@ -116,6 +124,18 @@ Required cases:
 - Unknown ticket returns `TICKET_NOT_FOUND`.
 - Unassigned checker returns `UNAUTHORIZED_CHECKER`.
 - Device time outside tolerance returns `DEVICE_TIME_INVALID` when time validation is active.
+- Provided device id must be registered, trusted, non-revoked, and owned by the current checker.
+- Revoked, pending/untrusted, wrong-checker, and unknown devices are rejected.
+- Missing device id follows `checkin.checker.device.required-for-online-scan`; default is false.
+- `X-Device-Id` and body `deviceId` mismatch returns `DEVICE_MISMATCH`.
+- QR token with `issuedAt` too far in the future returns `INVALID_QR`.
+- Malformed gate policy returns `WRONG_GATE` or equivalent fail-closed result.
+
+Task 7 notes:
+
+- Device time tolerance is not active in the current MVP service logic, so `DEVICE_TIME_INVALID` remains documented for the later time-validation task.
+- The concurrent double-scan test verifies that only one request can receive `VALID_CHECKED_IN` when the conditional update succeeds once and the losing scan reloads current state as `ALREADY_USED`.
+- The raw QR token storage check is covered by `CheckInLog` model tests and online scan log assertions that store only QR `jti`.
 
 ## Double Scan and Concurrency Tests
 
@@ -140,6 +160,8 @@ Implementation guidance:
 
 Endpoint target: `POST /api/v1/checker/offline-packages`.
 
+Task 8 coverage status: implemented with service unit tests, controller envelope tests, repository scope-query tests, and enum/result mapping coverage.
+
 Required cases:
 
 - Package is created for assigned checker/device scope.
@@ -155,7 +177,24 @@ Required cases:
 - Package does not contain JWT secret.
 - Package does not contain full email or phone.
 - Package checksum verifies.
-- Package signature verifies.
+- Package signature verifies when package-signing key infrastructure exists.
+- Unknown device cannot generate package.
+- PENDING/untrusted device cannot generate package.
+- Revoked device cannot generate package.
+- Another checker's device cannot generate package.
+- Missing device id cannot generate package.
+- Package response includes `keyAlgorithm` when public key is exposed.
+- Ticket snapshots include `usedAtGateId`.
+- Package response does not expose raw `gatePolicySnapshot`.
+- Malformed gate policy does not become unrestricted.
+
+Task 8 notes:
+
+- Package signature is intentionally null in the current implementation because there is no dedicated package-signing key infrastructure yet.
+- Checksum generation is tested for presence and persisted metadata. Exact checksum recomputation can be added when a shared package verification utility exists.
+- Public QR verification key exposure is tested as non-empty response metadata; private key and raw QR token exposure are covered by JSON safety assertions.
+- Max snapshot count enforcement is covered with `OFFLINE_PACKAGE_TOO_LARGE`.
+- Trusted device enforcement is covered by `CheckerDeviceValidationServiceTest` and offline package service tests.
 
 ## Offline Local Validation Test Scenarios
 

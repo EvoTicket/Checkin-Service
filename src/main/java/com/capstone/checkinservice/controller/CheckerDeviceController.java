@@ -1,6 +1,8 @@
 package com.capstone.checkinservice.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.capstone.checkinservice.dto.common.BaseResponse;
 import com.capstone.checkinservice.dto.request.CheckerDeviceRegisterRequest;
@@ -23,20 +25,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Checker Devices",
-        description = "APIs for checker device registration and readiness checks"
+        description = "APIs for registering and inspecting checker client devices"
 )
 public class CheckerDeviceController {
     private final CheckerDeviceService checkerDeviceService;
 
-    @PostMapping
+    @PostMapping({"/register", ""})
     @Operation(
             summary = "Register checker device",
             description = """
-                    Registers or updates a checker device used at the event gate.
-                    Device registration is used for scan audit, offline package scope,
-                    and readiness checks.
+                    Registers the current checker client installation and returns a
+                    server-generated device id. Newly registered devices start as
+                    pending and are not trusted by default.
                     """
     )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Device registered"),
+            @ApiResponse(responseCode = "400", description = "Invalid request shape"),
+            @ApiResponse(responseCode = "401", description = "Unauthenticated"),
+            @ApiResponse(responseCode = "500", description = "Unexpected system error")
+    })
     public ResponseEntity<BaseResponse<CheckerDeviceResponse>> registerDevice(
             @Valid @RequestBody CheckerDeviceRegisterRequest request
     ) {
@@ -44,6 +52,26 @@ public class CheckerDeviceController {
         return ResponseEntity.ok(BaseResponse.of(
                 HttpStatus.OK.value(),
                 "Checker device registered successfully",
+                response
+        ));
+    }
+
+    @GetMapping("/{deviceId}")
+    @Operation(
+            summary = "Get checker device status",
+            description = "Returns current status metadata for a device owned by the authenticated checker."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Device status fetched"),
+            @ApiResponse(responseCode = "401", description = "Unauthenticated"),
+            @ApiResponse(responseCode = "403", description = "Device is not owned by current checker"),
+            @ApiResponse(responseCode = "500", description = "Unexpected system error")
+    })
+    public ResponseEntity<BaseResponse<CheckerDeviceResponse>> getDevice(@PathVariable String deviceId) {
+        CheckerDeviceResponse response = checkerDeviceService.getDevice(deviceId);
+        return ResponseEntity.ok(BaseResponse.of(
+                HttpStatus.OK.value(),
+                "Fetched checker device successfully",
                 response
         ));
     }

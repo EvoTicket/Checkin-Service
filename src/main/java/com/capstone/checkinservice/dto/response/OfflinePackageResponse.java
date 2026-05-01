@@ -27,6 +27,8 @@ public class OfflinePackageResponse {
     private String keyId;
     private String publicVerificationKey;
     private String keyVersion;
+    private String keyAlgorithm;
+    private Integer snapshotCount;
     private List<TicketSnapshot> ticketSnapshots;
     private String checksum;
     private String packageSignature;
@@ -39,13 +41,15 @@ public class OfflinePackageResponse {
     public static class TicketSnapshot {
         private Long ticketAssetId;
         private String ticketCode;
+        private Long eventId;
+        private Long showtimeId;
         private String ticketTypeName;
         private String zoneLabel;
         private String seatLabel;
         private Integer qrVersion;
         private TicketAccessStatus accessStatus;
         private OffsetDateTime usedAt;
+        private String usedAtGateId;
         private List<String> allowedGateIds;
-        private String gatePolicySnapshot;
     }
 }

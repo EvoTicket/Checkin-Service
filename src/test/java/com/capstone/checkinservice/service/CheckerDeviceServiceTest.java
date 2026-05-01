@@ -4,6 +4,7 @@ import com.capstone.checkinservice.dto.request.CheckerDeviceRegisterRequest;
 import com.capstone.checkinservice.dto.response.CheckerDeviceReadinessResponse;
 import com.capstone.checkinservice.dto.response.CheckerDeviceResponse;
 import com.capstone.checkinservice.entity.CheckerDevice;
+import com.capstone.checkinservice.enums.CheckerDeviceStatus;
 import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.exception.CheckinBusinessException;
 import com.capstone.checkinservice.repository.CheckerDeviceRepository;
@@ -11,7 +12,6 @@ import com.capstone.checkinservice.security.CurrentUserProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -49,44 +49,41 @@ class CheckerDeviceServiceTest {
     }
 
     @Test
-    void registerDevice_createsNewDevice() {
+    void registerDevice_createsPendingUntrustedDeviceWithServerGeneratedId() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(7001L);
-        when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.empty());
         when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CheckerDeviceResponse response = service.registerDevice(request());
 
-        assertThat(response.getDeviceId()).isEqualTo("device-abc");
+        assertThat(response.getDeviceId()).startsWith("dev_");
         assertThat(response.getCheckerId()).isEqualTo(7001L);
-        assertThat(response.isTrusted()).isTrue();
+        assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.PENDING);
+        assertThat(response.isTrusted()).isFalse();
+        assertThat(response.isRevoked()).isFalse();
+        assertThat(response.getRegisteredAt().toInstant()).isEqualTo(NOW);
         assertThat(response.getLastSeenAt().toInstant()).isEqualTo(NOW);
     }
 
     @Test
-    void registerDevice_updatesExistingDeviceLastSeenAt() {
-        CheckerDevice existing = device(7001L, true, null);
-        existing.setLastSeenAt(NOW.minusSeconds(60));
+    void registerDevice_ignoresClientProvidedDeviceIdForNewDevice() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(7001L);
-        when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.of(existing));
-        when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        service.registerDevice(request());
-
-        ArgumentCaptor<CheckerDevice> captor = ArgumentCaptor.forClass(CheckerDevice.class);
-        verify(checkerDeviceRepository).save(captor.capture());
-        assertThat(captor.getValue().getLastSeenAt()).isEqualTo(NOW);
-    }
-
-    @Test
-    void registerDevice_bindsDeviceToCurrentChecker() {
-        CheckerDevice existing = device(7002L, true, null);
-        when(currentUserProvider.getCurrentUserId()).thenReturn(7001L);
-        when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.of(existing));
         when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CheckerDeviceResponse response = service.registerDevice(request());
 
-        assertThat(response.getCheckerId()).isEqualTo(7001L);
+        assertThat(response.getDeviceId()).isNotEqualTo("device-abc");
+    }
+
+    @Test
+    void getDeviceStatusWorksForOwnerChecker() {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(7001L);
+        when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.of(device(7001L, true, null)));
+
+        CheckerDeviceResponse response = service.getDevice("device-abc");
+
+        assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.TRUSTED);
+        assertThat(response.isTrusted()).isTrue();
+        assertThat(response.isRevoked()).isFalse();
     }
 
     @Test
@@ -97,6 +94,7 @@ class CheckerDeviceServiceTest {
         CheckerDeviceReadinessResponse response = service.getReadiness("device-abc");
 
         assertThat(response.isRegistered()).isTrue();
+        assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.TRUSTED);
         assertThat(response.isTrusted()).isTrue();
         assertThat(response.isRevoked()).isFalse();
         assertThat(response.getServerTime().toInstant()).isEqualTo(NOW);
@@ -110,7 +108,7 @@ class CheckerDeviceServiceTest {
         assertThatExceptionOfType(CheckinBusinessException.class)
                 .isThrownBy(() -> service.getReadiness("device-abc"))
                 .satisfies(exception -> {
-                    assertThat(exception.getResultCode()).isEqualTo(ScanResult.UNAUTHORIZED_CHECKER);
+                    assertThat(exception.getResultCode()).isEqualTo(ScanResult.DEVICE_NOT_ALLOWED);
                     assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
                 });
     }
@@ -124,8 +122,33 @@ class CheckerDeviceServiceTest {
         CheckerDeviceReadinessResponse response = service.getReadiness("device-abc");
 
         assertThat(response.isRegistered()).isTrue();
+        assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.REVOKED);
         assertThat(response.isRevoked()).isTrue();
         assertThat(response.getMessage()).containsIgnoringCase("revoked");
+    }
+
+    @Test
+    void trustDeviceMarksDeviceTrusted() {
+        CheckerDevice device = device(7001L, false, null);
+        when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.of(device));
+        when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CheckerDeviceResponse response = service.trustDevice("device-abc");
+
+        assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.TRUSTED);
+        assertThat(response.getTrustedAt().toInstant()).isEqualTo(NOW);
+    }
+
+    @Test
+    void revokeDeviceMarksDeviceRevoked() {
+        CheckerDevice device = device(7001L, true, null);
+        when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.of(device));
+        when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CheckerDeviceResponse response = service.revokeDevice("device-abc");
+
+        assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.REVOKED);
+        assertThat(response.getRevokedAt().toInstant()).isEqualTo(NOW);
     }
 
     private CheckerDeviceRegisterRequest request() {
@@ -133,6 +156,8 @@ class CheckerDeviceServiceTest {
                 .deviceId("device-abc")
                 .deviceName("Gate phone")
                 .platform("WEB")
+                .userAgent("Mozilla/5.0")
+                .appVersion("0.9.3")
                 .build();
     }
 
@@ -142,6 +167,7 @@ class CheckerDeviceServiceTest {
                 .checkerId(checkerId)
                 .deviceName("Old phone")
                 .platform("WEB")
+                .registeredAt(NOW.minusSeconds(3600))
                 .lastSeenAt(NOW.minusSeconds(60))
                 .trusted(trusted)
                 .revokedAt(revokedAt)

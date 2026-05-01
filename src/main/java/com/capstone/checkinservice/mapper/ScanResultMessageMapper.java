@@ -193,6 +193,46 @@ public final class ScanResultMessageMapper {
                     false,
                     false
             );
+            case OFFLINE_PACKAGE_TOO_LARGE -> message(
+                    result,
+                    "Offline package too large",
+                    "The requested offline package has too many ticket snapshots.",
+                    WARNING,
+                    false,
+                    false
+            );
+            case DEVICE_NOT_ALLOWED -> message(
+                    result,
+                    "Device not allowed",
+                    "This checker device is not registered for the current checker.",
+                    ERROR,
+                    false,
+                    false
+            );
+            case DEVICE_NOT_TRUSTED -> message(
+                    result,
+                    "Device pending",
+                    "This checker device is registered but has not been trusted yet.",
+                    WARNING,
+                    false,
+                    false
+            );
+            case DEVICE_REVOKED -> message(
+                    result,
+                    "Device revoked",
+                    "This checker device has been revoked.",
+                    ERROR,
+                    false,
+                    false
+            );
+            case DEVICE_MISMATCH -> message(
+                    result,
+                    "Device mismatch",
+                    "The device id header and request body do not match.",
+                    ERROR,
+                    false,
+                    false
+            );
             case DEVICE_TIME_INVALID -> message(
                     result,
                     "Device time invalid",

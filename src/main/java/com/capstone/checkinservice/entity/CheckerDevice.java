@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -50,6 +51,18 @@ public class CheckerDevice extends BaseTimeEntity {
     @Column(name = "platform")
     private String platform;
 
+    @Column(name = "user_agent", columnDefinition = "TEXT")
+    private String userAgent;
+
+    @Column(name = "app_version")
+    private String appVersion;
+
+    @Column(name = "registered_at", nullable = false)
+    private Instant registeredAt;
+
+    @Column(name = "trusted_at")
+    private Instant trustedAt;
+
     @Column(name = "last_seen_at")
     private Instant lastSeenAt;
 
@@ -58,4 +71,11 @@ public class CheckerDevice extends BaseTimeEntity {
 
     @Column(name = "revoked_at")
     private Instant revokedAt;
+
+    @PrePersist
+    protected void ensureRegisteredAt() {
+        if (registeredAt == null) {
+            registeredAt = Instant.now();
+        }
+    }
 }

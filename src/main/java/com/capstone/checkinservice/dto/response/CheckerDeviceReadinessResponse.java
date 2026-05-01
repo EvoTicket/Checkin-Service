@@ -1,5 +1,6 @@
 package com.capstone.checkinservice.dto.response;
 
+import com.capstone.checkinservice.enums.CheckerDeviceStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +18,7 @@ public class CheckerDeviceReadinessResponse {
     private String deviceId;
     private Long checkerId;
     private boolean registered;
+    private CheckerDeviceStatus status;
     private boolean trusted;
     private boolean revoked;
     private OffsetDateTime serverTime;

@@ -53,6 +53,7 @@ public class QrTokenVerifier {
 
         QrTokenPayload payload = deserialize(segments[1], QrTokenPayload.class);
         payload.validate();
+        validateIssuedAt(payload, verificationTime);
         validateExpiration(payload, verificationTime);
 
         return payload;
@@ -102,7 +103,14 @@ public class QrTokenVerifier {
     private void validateExpiration(QrTokenPayload payload, Instant verificationTime) {
         Instant exclusiveExpiry = payload.expiresAt().plusSeconds(properties.getClockSkewSeconds());
         if (!verificationTime.isBefore(exclusiveExpiry)) {
-            throw new QrTokenException(ScanResult.QR_EXPIRED, "QR token has expired");
+            throw new QrTokenException(ScanResult.QR_EXPIRED, "QR token has expired", payload);
+        }
+    }
+
+    private void validateIssuedAt(QrTokenPayload payload, Instant verificationTime) {
+        Instant allowedFutureIssuedAt = verificationTime.plusSeconds(properties.getClockSkewSeconds());
+        if (payload.issuedAt().isAfter(allowedFutureIssuedAt)) {
+            throw new QrTokenException(ScanResult.INVALID_QR, "QR token issuedAt is in the future", payload);
         }
     }
 }

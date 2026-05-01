@@ -75,7 +75,7 @@ public class OfflinePackage {
     @Column(name = "checksum", nullable = false)
     private String checksum;
 
-    @Column(name = "package_signature", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "package_signature", columnDefinition = "TEXT")
     private String packageSignature;
 
     @Enumerated(EnumType.STRING)

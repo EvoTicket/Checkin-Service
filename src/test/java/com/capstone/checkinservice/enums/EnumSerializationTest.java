@@ -36,6 +36,11 @@ class EnumSerializationTest {
                         "TICKET_NOT_FOUND",
                         "OFFLINE_PACKAGE_EXPIRED",
                         "OFFLINE_PACKAGE_NOT_FOUND",
+                        "OFFLINE_PACKAGE_TOO_LARGE",
+                        "DEVICE_NOT_ALLOWED",
+                        "DEVICE_NOT_TRUSTED",
+                        "DEVICE_REVOKED",
+                        "DEVICE_MISMATCH",
                         "DEVICE_TIME_INVALID"
                 );
     }

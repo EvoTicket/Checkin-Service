@@ -55,6 +55,26 @@ class QrTokenSignerVerifierTest {
     }
 
     @Test
+    void futureIssuedAtRejected() throws Exception {
+        QrTokenPayload futurePayload = new QrTokenPayload(
+                12345L,
+                "TCK-12345",
+                99L,
+                501L,
+                7,
+                ISSUED_AT.plusSeconds(60),
+                EXPIRES_AT.plusSeconds(60),
+                "jti-future"
+        );
+        String token = signer.sign(futurePayload);
+
+        assertResultCode(
+                () -> verifier.verify(token, ISSUED_AT),
+                ScanResult.INVALID_QR
+        );
+    }
+
+    @Test
     void expiresAtEqualVerificationTimeRejected() {
         String token = signer.sign(validPayload());
 

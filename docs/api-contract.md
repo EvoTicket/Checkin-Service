@@ -116,6 +116,11 @@ Recommended QR TTL is 20 to 30 seconds. Recommended frontend refresh interval is
 | `TICKET_NOT_FOUND` | Ticket projection was not found. |
 | `OFFLINE_PACKAGE_EXPIRED` | Offline package is expired. |
 | `OFFLINE_PACKAGE_NOT_FOUND` | Package id is unknown or not assigned to this checker/device. |
+| `OFFLINE_PACKAGE_TOO_LARGE` | Requested offline package exceeds the configured snapshot limit. |
+| `DEVICE_NOT_ALLOWED` | Device is missing, unknown, or not owned by the current checker. |
+| `DEVICE_NOT_TRUSTED` | Device is registered but pending trust approval. |
+| `DEVICE_REVOKED` | Device has been revoked and cannot be used. |
+| `DEVICE_MISMATCH` | `X-Device-Id` header and request body device id do not match. |
 | `DEVICE_TIME_INVALID` | Device scan time is outside accepted tolerance. |
 
 ## GET /api/v1/tickets/{ticketAssetId}/qr-token
@@ -278,13 +283,25 @@ Business notes:
 - If `allowedGateIds` is present, later validation requires the requested `gateId` to be included.
 - Exact IAM role names are still open.
 
-## POST /api/v1/checker/devices
+## Checker Device Management
 
-Swagger tag: `Checker Assignments`
+Checker identity and checker device trust are separate. Authentication resolves the checker; the server-side device record decides whether a client installation is allowed to operate. Device id is not proof by itself.
+
+Device statuses:
+
+- `PENDING`: registered but not trusted.
+- `TRUSTED`: trusted and not revoked.
+- `REVOKED`: blocked.
+
+Checker-facing APIs do not allow self-trust. Trust/revoke is future admin/organizer/internal work; current service methods support tests/seed/admin integration without exposing public self-trust.
+
+## POST /api/v1/checker/devices/register
+
+Swagger tag: `Checker Devices`
 
 Purpose:
 
-- Register or update a checker device record for later offline package and sync workflows.
+- Register a checker client installation for later review/trust.
 
 Auth/role:
 
@@ -293,17 +310,19 @@ Auth/role:
 
 Request fields:
 
-- `deviceId`, required.
 - `deviceName`, optional.
 - `platform`, optional.
+- `userAgent`, optional.
+- `appVersion`, optional.
 
 Request example:
 
 ```json
 {
-  "deviceId": "device-abc",
-  "deviceName": "Gate phone",
-  "platform": "WEB"
+  "deviceName": "iPhone Gate B - 01",
+  "platform": "PWA",
+  "userAgent": "Mozilla/5.0...",
+  "appVersion": "0.9.3"
 }
 ```
 
@@ -313,9 +332,15 @@ Response fields:
 - `checkerId`
 - `deviceName`
 - `platform`
+- `appVersion`
+- `status`
 - `trusted`
+- `revoked`
+- `registeredAt`
+- `trustedAt`
 - `revokedAt`
 - `lastSeenAt`
+- `message`
 
 Success example:
 
@@ -324,30 +349,37 @@ Success example:
   "status": 200,
   "message": "Checker device registered successfully",
   "data": {
-    "deviceId": "device-abc",
+    "deviceId": "dev_9d4d6c4a-...",
     "checkerId": 7001,
-    "deviceName": "Gate phone",
-    "platform": "WEB",
-    "trusted": true,
+    "deviceName": "iPhone Gate B - 01",
+    "platform": "PWA",
+    "appVersion": "0.9.3",
+    "status": "PENDING",
+    "trusted": false,
+    "revoked": false,
+    "registeredAt": "2026-05-01T10:00:00Z",
+    "trustedAt": null,
     "revokedAt": null,
-    "lastSeenAt": "2026-05-01T10:00:00Z"
+    "lastSeenAt": "2026-05-01T10:00:00Z",
+    "message": "Thiet bi da duoc ghi nhan. Vui long cho quan ly duyet."
   }
 }
 ```
 
 Business notes:
 
-- MVP defaults newly registered checker devices to `trusted=true` for local/demo readiness.
-- Existing device records are rebound to the current checker on registration and `lastSeenAt` is updated.
-- This endpoint does not issue offline packages and does not perform admission logic.
+- Device ids are generated server-side.
+- Client-provided `deviceId` is ignored for new registration.
+- New devices are `PENDING` and `trusted=false`.
+- This endpoint does not issue offline packages, trust a device, or perform admission logic.
 
-## GET /api/v1/checker/devices/{deviceId}/readiness
+## GET /api/v1/checker/devices/{deviceId}
 
-Swagger tag: `Checker Assignments`
+Swagger tag: `Checker Devices`
 
 Purpose:
 
-- Return server-known checker device readiness metadata for the checker UI.
+- Return current device status for a device owned by the authenticated checker.
 
 Auth/role:
 
@@ -362,11 +394,16 @@ Response fields:
 
 - `deviceId`
 - `checkerId`
-- `registered`
+- `deviceName`
+- `platform`
+- `appVersion`
+- `status`
 - `trusted`
 - `revoked`
-- `serverTime`
-- `message`
+- `registeredAt`
+- `trustedAt`
+- `revokedAt`
+- `lastSeenAt`
 
 Success example:
 
@@ -400,7 +437,21 @@ Failure example:
 
 Result codes:
 
-- `UNAUTHORIZED_CHECKER`
+- `DEVICE_NOT_ALLOWED`
+
+## GET /api/v1/checker/devices/{deviceId}/readiness
+
+Swagger tag: `Checker Devices`
+
+Purpose:
+
+- Compatibility readiness endpoint for checker UI status polling.
+
+Business notes:
+
+- Returns registered/trusted/revoked facts only.
+- Does not self-trust the device.
+- Another checker's device returns `DEVICE_NOT_ALLOWED`.
 
 Business notes:
 
@@ -411,6 +462,8 @@ Business notes:
 ## POST /api/v1/checker/scan
 
 Swagger tag: `Checker Scan`
+
+Implementation status: implemented in Task 7.
 
 Purpose:
 
@@ -429,6 +482,12 @@ Request fields:
 - `gateId`: optional gate identifier.
 - `deviceId`: optional checker device id.
 - `scannedAt`: client scan time.
+
+Device id convention:
+
+- `X-Device-Id` header is supported.
+- Body `deviceId` is also supported for existing clients.
+- If both are present, they must match or the API returns `DEVICE_MISMATCH`.
 
 Request example:
 
@@ -507,6 +566,10 @@ Result codes:
 - `UNAUTHORIZED_CHECKER`
 - `TICKET_NOT_FOUND`
 - `DEVICE_TIME_INVALID`
+- `DEVICE_NOT_ALLOWED`
+- `DEVICE_NOT_TRUSTED`
+- `DEVICE_REVOKED`
+- `DEVICE_MISMATCH`
 
 Business notes:
 
@@ -516,10 +579,20 @@ Business notes:
 - If gate policy is absent or empty, gate validation is skipped/defaulted.
 - If gate policy exists and `gateId` is not allowed, return `WRONG_GATE`.
 - `CheckInLog` stores the actual `gateId` used during scan.
+- Check-in success uses server time for `checkedInAt`, `usedAt`, and the atomic update timestamp.
+- If `deviceId` is provided, it must reference a registered, trusted, non-revoked device owned by the current checker.
+- Missing `deviceId` is allowed by default for online scan while `checkin.checker.device.required-for-online-scan=false`; enabling that config requires a valid trusted device.
+- Client `scannedAt` is logged only if within `checkin.checker.clock-skew-seconds`, default 300 seconds. Outside that window returns `DEVICE_TIME_INVALID`.
+- QR `issuedAt` too far in the future is rejected as `INVALID_QR`.
+- Malformed gate policies fail closed and do not become unrestricted access.
+- The raw QR token is never stored; signed expired tokens are logged by QR `jti` when the verifier can identify the payload.
+- Totally invalid or untrusted QR tokens are returned as `INVALID_QR` or `INVALID_SIGNATURE`; they are not logged because the current `check_in_log.ticket_asset_id` model is non-null and the payload is not trusted.
 
 ## POST /api/v1/checker/offline-packages
 
 Swagger tag: `Offline Package`
+
+Implementation status: implemented in Task 8.
 
 Purpose:
 
@@ -536,6 +609,7 @@ Request fields:
 - `showtimeId`
 - `gateId`, optional
 - `deviceId`
+- optional `requestedAt`
 - optional `requestedValidityMinutes`
 
 Request example:
@@ -546,6 +620,7 @@ Request example:
   "showtimeId": 501,
   "gateId": "A1",
   "deviceId": "device-abc",
+  "requestedAt": "2026-05-01T08:00:00Z",
   "requestedValidityMinutes": 240
 }
 ```
@@ -561,7 +636,10 @@ Response fields:
 - `issuedAt`
 - `validUntil`
 - `keyId`
-- `publicVerificationKey` or `keyVersion`
+- `publicVerificationKey`
+- `keyVersion`
+- `keyAlgorithm`
+- `snapshotCount`
 - `ticketSnapshots[]`
 - `checksum`
 - `packageSignature`
@@ -582,21 +660,28 @@ Success example:
     "issuedAt": "2026-05-01T08:00:00Z",
     "validUntil": "2026-05-01T12:00:00Z",
     "keyId": "qr-key-2026-05",
+    "publicVerificationKey": "base64-subject-public-key-info",
+    "keyVersion": "qr-key-2026-05",
+    "keyAlgorithm": "EC",
+    "snapshotCount": 1,
     "ticketSnapshots": [
       {
         "ticketAssetId": 12345,
         "ticketCode": "TCK-001",
+        "eventId": 99,
+        "showtimeId": 501,
         "ticketTypeName": "VIP",
         "zoneLabel": "Zone A",
         "seatLabel": "A-12",
         "qrVersion": 3,
         "accessStatus": "VALID",
         "usedAt": null,
+        "usedAtGateId": null,
         "allowedGateIds": ["A1"]
       }
     ],
     "checksum": "sha256:...",
-    "packageSignature": "..."
+    "packageSignature": null
   }
 }
 ```
@@ -619,12 +704,30 @@ Result codes:
 - `WRONG_EVENT`
 - `WRONG_SHOWTIME`
 - `WRONG_GATE`
+- `OFFLINE_PACKAGE_TOO_LARGE`
+- `DEVICE_NOT_ALLOWED`
+- `DEVICE_NOT_TRUSTED`
+- `DEVICE_REVOKED`
+- `DEVICE_MISMATCH`
 
 Business notes:
 
 - Offline package is for checker devices only.
+- Offline package generation requires a registered, trusted, non-revoked device owned by the current checker. Unknown or pending devices are rejected.
 - Package must not contain private signing key, raw QR secret, JWT secret, full sensitive PII, full email, or full phone.
 - Offline package does not mark tickets used on the server.
+- Server time is the source of truth for `issuedAt`; `requestedAt` is accepted only as request metadata.
+- Default package TTL is `checkin.offline-package.ttl-minutes` and currently defaults to 360 minutes. `requestedValidityMinutes` may shorten the package but cannot exceed the configured TTL.
+- The configured max snapshot count is `checkin.offline-package.max-ticket-snapshots`, defaulting to 5000. Exceeding it returns `OFFLINE_PACKAGE_TOO_LARGE`.
+- The package includes all ticket access statuses for the requested event/showtime so local validation can reject `USED`, `LOCKED_RESALE`, and `CANCELLED` offline.
+- MVP packages are not strictly gate-filtered. They include each ticket's sanitized `allowedGateIds` so frontend local validation can return `WRONG_GATE`.
+- Raw internal `gatePolicySnapshot` is not returned in package responses.
+- Ticket snapshots include `usedAtGateId` for already-used tickets.
+- `checksum` is SHA-256 over deterministic package metadata plus ticket snapshots, excluding `checksum` and `packageSignature`.
+- `checksum` is an integrity checksum, not a tamper-proof signature.
+- `publicVerificationKey` is the Base64-encoded public QR verification key for the current `keyId`. Private key material is never exposed.
+- `packageSignature` is currently null because a dedicated package-signing key infrastructure is not implemented yet.
+- The full ticket snapshot body is returned to the checker device but only package metadata is persisted in `offline_package`.
 
 ## POST /api/v1/checker/offline-sync
 

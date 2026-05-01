@@ -24,6 +24,8 @@ public interface TicketAccessStateRepository extends JpaRepository<TicketAccessS
             TicketAccessStatus accessStatus
     );
 
+    List<TicketAccessState> findByEventIdAndShowtimeId(Long eventId, Long showtimeId);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE TicketAccessState t
