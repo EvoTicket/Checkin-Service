@@ -1,4 +1,4 @@
-package org.codewithphuc.checkinservice;
+package com.capstone.checkinservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
