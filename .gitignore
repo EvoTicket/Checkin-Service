@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# Local Spring Boot configs
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-dev-local.yml

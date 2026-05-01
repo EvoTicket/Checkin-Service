@@ -1,0 +1,14 @@
+package com.capstone.checkinservice.enums;
+
+public enum FailureReason {
+    AUTHORIZATION_FAILED,
+    TOKEN_INVALID,
+    TOKEN_EXPIRED,
+    TICKET_STATE_INVALID,
+    ASSIGNMENT_INVALID,
+    GATE_POLICY_FAILED,
+    DEVICE_TIME_INVALID,
+    PACKAGE_INVALID,
+    TECHNICAL_ERROR,
+    UNKNOWN
+}
