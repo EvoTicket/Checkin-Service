@@ -1,6 +1,7 @@
 package com.capstone.checkinservice.dto.request;
 
 import com.capstone.checkinservice.enums.ScanResult;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,9 +23,20 @@ public class OfflineSyncRequest {
     @Size(max = 128)
     private String packageId;
 
+    @NotNull
+    private Long eventId;
+
+    @NotNull
+    private Long showtimeId;
+
+    @Size(max = 128)
+    private String gateId;
+
     @NotBlank
     @Size(max = 128)
     private String deviceId;
+
+    private OffsetDateTime syncedAt;
 
     @Valid
     @NotNull
@@ -36,27 +48,30 @@ public class OfflineSyncRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class OfflineSyncItemRequest {
-        @NotBlank
         @Size(max = 128)
         private String localScanId;
 
-        @NotBlank
         @Size(max = 4096)
         private String qrToken;
 
-        @NotNull
+        private Long ticketAssetId;
+
+        @Size(max = 128)
+        private String qrTokenId;
+
         private Long eventId;
 
-        @NotNull
         private Long showtimeId;
 
         @Size(max = 128)
         private String gateId;
 
-        @NotNull
+        @Size(max = 128)
+        private String deviceId;
+
+        @JsonAlias("localResult")
         private ScanResult localResultCode;
 
-        @NotNull
         private OffsetDateTime scannedAt;
     }
 }

@@ -4,6 +4,7 @@ import com.capstone.checkinservice.repository.CheckerAssignmentRepository;
 import com.capstone.checkinservice.repository.CheckerDeviceRepository;
 import com.capstone.checkinservice.repository.CheckInLogRepository;
 import com.capstone.checkinservice.repository.OfflinePackageRepository;
+import com.capstone.checkinservice.repository.OfflineSyncItemRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,9 @@ class CheckinServiceApplicationTests {
 
     @MockBean
     private OfflinePackageRepository offlinePackageRepository;
+
+    @MockBean
+    private OfflineSyncItemRepository offlineSyncItemRepository;
 
     @Test
     void contextLoads() {

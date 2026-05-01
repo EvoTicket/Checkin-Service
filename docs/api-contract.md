@@ -733,6 +733,8 @@ Business notes:
 
 Swagger tag: `Offline Sync`
 
+Implementation status: implemented in Task 9.
+
 Purpose:
 
 - Sync provisional offline scan results and classify each item.
@@ -745,14 +747,21 @@ Auth/role:
 Request fields:
 
 - `packageId`
+- `eventId`
+- `showtimeId`
+- `gateId`, optional batch gate.
 - `deviceId`
+- `syncedAt`, optional client timestamp; server sync time is used as the persisted sync time.
 - `items[]`
 - `localScanId`
 - `qrToken`
-- `eventId`
-- `showtimeId`
-- `gateId`
-- `localResultCode`
+- `ticketAssetId`, optional local cache hint used only when the QR cannot be trusted.
+- `qrTokenId`, optional local cache hint used only when the QR cannot be trusted.
+- `eventId`, optional item override; if present and different from the batch context it is rejected.
+- `showtimeId`, optional item override; if present and different from the batch context it is rejected.
+- `gateId`, optional item override. Item gate wins over batch gate for deterministic processing.
+- `deviceId`, optional item override. Item device wins over batch device for local context, but a mismatch with the package device fails the item.
+- `localResult` or `localResultCode`, usually `OFFLINE_ACCEPTED_PENDING_SYNC`.
 - `scannedAt`
 
 Request example:
@@ -760,16 +769,21 @@ Request example:
 ```json
 {
   "packageId": "pkg-20260501-001",
+  "eventId": 99,
+  "showtimeId": 501,
+  "gateId": "A1",
   "deviceId": "device-abc",
+  "syncedAt": "2026-05-01T20:05:00Z",
   "items": [
     {
       "localScanId": "local-1",
       "qrToken": "header.payload.signature",
-      "eventId": 99,
-      "showtimeId": 501,
+      "ticketAssetId": 12345,
+      "qrTokenId": "jti-12345",
+      "localResult": "OFFLINE_ACCEPTED_PENDING_SYNC",
+      "scannedAt": "2026-05-01T09:10:00Z",
       "gateId": "A1",
-      "localResultCode": "OFFLINE_ACCEPTED_PENDING_SYNC",
-      "scannedAt": "2026-05-01T09:10:00Z"
+      "deviceId": "device-abc"
     }
   ]
 }
@@ -778,16 +792,28 @@ Request example:
 Response fields:
 
 - `packageId`
+- `eventId`
+- `showtimeId`
+- `gateId`
+- `deviceId`
+- `syncedAt`
 - `summary`
-- `acceptedCount`
-- `rejectedCount`
-- `failedCount`
-- `conflictCount`
+- `summary.total`
+- `summary.accepted`
+- `summary.rejected`
+- `summary.failed`
+- `summary.conflict`
+- `acceptedCount`, `rejectedCount`, `failedCount`, and `conflictCount` are also returned for backward-compatible consumers.
 - `items[]`
 - `localScanId`
 - `ticketAssetId`
-- `syncResult`
-- `scanResultCode`
+- `ticketCode`
+- `syncStatus` and `syncResult`
+- `resultCode`, one of `SYNC_ACCEPTED`, `SYNC_REJECTED`, `SYNC_FAILED`, or `SYNC_CONFLICT`
+- `scanResultCode`, the server-side business code such as `VALID_CHECKED_IN`, `ALREADY_USED`, `WRONG_GATE`, or `INVALID_SIGNATURE`
+- `title`, `message`, and `resultMessage`
+- `local.resultCode`, `local.scannedAt`, `local.gateId`, `local.deviceId`
+- `server.resultCode`, with used-ticket fields when available
 - optional `conflictDetails`
 
 Success example:
@@ -798,6 +824,18 @@ Success example:
   "message": "Offline sync processed",
   "data": {
     "packageId": "pkg-20260501-001",
+    "eventId": 99,
+    "showtimeId": 501,
+    "gateId": "A1",
+    "deviceId": "device-abc",
+    "syncedAt": "2026-05-01T20:05:00Z",
+    "summary": {
+      "total": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "failed": 0,
+      "conflict": 0
+    },
     "acceptedCount": 1,
     "rejectedCount": 0,
     "failedCount": 0,
@@ -806,8 +844,20 @@ Success example:
       {
         "localScanId": "local-1",
         "ticketAssetId": 12345,
+        "ticketCode": "TCK-001",
+        "syncStatus": "SYNC_ACCEPTED",
         "syncResult": "SYNC_ACCEPTED",
-        "scanResultCode": "VALID_CHECKED_IN"
+        "resultCode": "SYNC_ACCEPTED",
+        "scanResultCode": "VALID_CHECKED_IN",
+        "local": {
+          "resultCode": "OFFLINE_ACCEPTED_PENDING_SYNC",
+          "scannedAt": "2026-05-01T09:10:00Z",
+          "gateId": "A1",
+          "deviceId": "device-abc"
+        },
+        "server": {
+          "resultCode": "VALID_CHECKED_IN"
+        }
       }
     ]
   }
@@ -822,6 +872,18 @@ Conflict example:
   "message": "Offline sync processed with conflicts",
   "data": {
     "packageId": "pkg-20260501-001",
+    "eventId": 99,
+    "showtimeId": 501,
+    "gateId": "A1",
+    "deviceId": "device-abc",
+    "syncedAt": "2026-05-01T20:05:00Z",
+    "summary": {
+      "total": 1,
+      "accepted": 0,
+      "rejected": 0,
+      "failed": 0,
+      "conflict": 1
+    },
     "acceptedCount": 0,
     "rejectedCount": 0,
     "failedCount": 0,
@@ -830,8 +892,24 @@ Conflict example:
       {
         "localScanId": "local-1",
         "ticketAssetId": 12345,
+        "ticketCode": "TCK-001",
+        "syncStatus": "SYNC_CONFLICT",
         "syncResult": "SYNC_CONFLICT",
+        "resultCode": "SYNC_CONFLICT",
         "scanResultCode": "ALREADY_USED",
+        "local": {
+          "resultCode": "OFFLINE_ACCEPTED_PENDING_SYNC",
+          "scannedAt": "2026-05-01T09:10:00Z",
+          "gateId": "A1",
+          "deviceId": "device-abc"
+        },
+        "server": {
+          "resultCode": "ALREADY_USED",
+          "usedAt": "2026-05-01T09:05:00Z",
+          "usedAtGateId": "A2",
+          "usedByCheckerId": 7002,
+          "usedByDeviceId": "device-other"
+        },
         "conflictDetails": {
           "localResult": "OFFLINE_ACCEPTED_PENDING_SYNC",
           "serverResult": "ALREADY_USED",
@@ -856,9 +934,16 @@ Result codes:
 
 Business notes:
 
+- A syntactically valid batch returns HTTP 200 with per-item results. Transport errors are reserved for malformed batch shape, unauthenticated access, checker/device/package denial, package not found, expired package, or unexpected system errors.
+- `SYNC_ACCEPTED` means the server accepted the offline scan and atomically marked `ticket_access_state` from `VALID` to `USED`.
+- `SYNC_REJECTED` means retry will not solve the business denial. Current implementation uses it for `QR_EXPIRED`, `INVALID_SIGNATURE`, `WRONG_EVENT`, `WRONG_SHOWTIME`, `WRONG_GATE`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, `CANCELLED`, and trusted `TICKET_NOT_FOUND`.
+- `SYNC_FAILED` means the item is malformed or cannot be safely processed, such as missing `localScanId`, missing `qrToken`, missing `scannedAt`, invalid QR format, device mismatch, or unexpected per-item technical failure.
+- `SYNC_CONFLICT` means the offline device locally accepted the scan but the server state is already `USED`, including when the conditional update loses a race. MVP does not allow checker override.
 - QR expiration must be checked against item `scannedAt`.
-- `SYNC_CONFLICT` must be escalated; checker cannot override in MVP.
-- Each sync item should write or update an `offline_sync_item` record and a `CheckInLog` entry where appropriate.
+- The endpoint reuses the same conditional `markUsedIfValid(...)` atomic update strategy as online scan.
+- Idempotency uses the `offline_sync_item` unique key `(packageId, localScanId)`. A retry of an already persisted item returns the stored sync result and does not create another check-in log.
+- Each persisted sync item writes `offline_sync_item` with local id, package id, ticket id, QR `jti`, checker/device/context, sync result, server result, timestamps, and conflict metadata where applicable.
+- `CheckInLog` is written for sync items that have enough trusted or locally supplied identifiers. It stores `scanMode=OFFLINE_SYNC`, `scanResult=SYNC_ACCEPTED/SYNC_REJECTED/SYNC_FAILED/SYNC_CONFLICT`, original `scannedAt`, server `syncedAt`, QR `jti`, failure reason, and conflict status. Raw QR tokens are not stored.
 
 ## GET /api/v1/checker/tickets/{ticketAssetId}/owner-info
 

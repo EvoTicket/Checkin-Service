@@ -118,6 +118,16 @@ Task 7 online scan logging:
 - Stores QR `jti` as `qr_token_id`; it does not store the raw QR token.
 - Does not log totally invalid or untrusted QR tokens because `ticket_asset_id` is currently required and the service does not trust unsigned payload data.
 
+Task 9 offline sync logging:
+
+- Writes `CheckInLog` for offline sync items when enough identifiers are available.
+- Uses `scan_mode=OFFLINE_SYNC`.
+- Uses `scan_result=SYNC_ACCEPTED`, `SYNC_REJECTED`, `SYNC_FAILED`, or `SYNC_CONFLICT` so operations can distinguish final sync outcomes from online scan results.
+- Stores the original offline `scanned_at` and the server-side `synced_at`.
+- Stores QR `jti` as `qr_token_id` when available and never stores the raw QR token.
+- Sets `conflict_status=CONFLICT` for `SYNC_CONFLICT`; otherwise uses `NONE`.
+- Stores the server business result such as `VALID_CHECKED_IN`, `ALREADY_USED`, `WRONG_GATE`, or `INVALID_SIGNATURE` in `raw_error_code` for compact operational context.
+
 ### checker_assignment
 
 Purpose:
@@ -248,6 +258,7 @@ Storage note:
 Purpose:
 
 - Track each pending offline scan item synced by a checker device.
+- Task 9 implements this MVP persistence model and uses `(package_id, local_scan_id)` for idempotency.
 
 Fields:
 
@@ -279,6 +290,14 @@ Indexes:
 - Index on `qr_token_id`.
 - Index on `(sync_result, synced_at)`.
 - Index on `(checker_id, device_id)`.
+
+Task 9 sync persistence behavior:
+
+- `SYNC_ACCEPTED` items are persisted after the same conditional `ticket_access_state` update used by online scan succeeds.
+- `SYNC_REJECTED`, `SYNC_FAILED`, and `SYNC_CONFLICT` items are persisted when `local_scan_id` and a ticket identifier are available.
+- Duplicate retries are resolved by `package_id + local_scan_id`; the service returns the existing stored result and does not create duplicate `CheckInLog` rows.
+- Conflict metadata is stored as JSON in `conflict_details` when a server-used ticket conflicts with local offline acceptance.
+- `qr_token_id` stores QR `jti` only. Raw QR tokens are not persisted.
 
 ## Future Extension Tables
 

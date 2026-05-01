@@ -220,6 +220,8 @@ Required scenarios:
 
 Endpoint target: `POST /api/v1/checker/offline-sync`.
 
+Task 9 coverage status: implemented with service unit tests for classification, idempotency, logging, and atomic-update conflict handling, plus controller envelope tests.
+
 Required cases:
 
 - Accepted sync marks ticket `USED`.
@@ -238,6 +240,14 @@ Required cases:
 - QR expiration is checked at item `scannedAt`, not current server time.
 - Sync summary counts accepted, rejected, failed, and conflict items correctly.
 - Duplicate `(packageId, localScanId)` is idempotent.
+
+Task 9 notes:
+
+- QR expiration is verified at item `scannedAt` by passing that timestamp to the QR verifier.
+- Invalid QR format is classified as `SYNC_FAILED`; invalid signature and expired QR are classified as `SYNC_REJECTED`.
+- Already-used state after local offline acceptance is classified as `SYNC_CONFLICT`.
+- The focused service tests cover accepted, log creation, summary counts, conflict with server used context, cancelled, locked resale, wrong event, wrong showtime, wrong gate, QR version mismatch, QR expired, invalid signature, malformed item, invalid QR format, mixed batches, duplicate retry, raw QR non-storage, and unassigned checker denial.
+- Atomic update race behavior is covered by the failed conditional update path reloading a `USED` ticket as `SYNC_CONFLICT`. Full multi-threaded repository-backed offline sync concurrency can be added when a database concurrency test harness is introduced.
 
 ## Repository Tests
 

@@ -358,6 +358,7 @@ Any future implementation task that creates or modifies controllers must include
 ### Task 9 - Offline sync, rejected, failed, and conflict handling
 
 - Goal: reconcile provisional offline scans.
+- Status: implemented.
 - Scope: sync endpoint, item processing, conflict classification, summary response.
 - Files: offline sync controller/service/entities/tests.
 - APIs affected: `POST /api/v1/checker/offline-sync`.

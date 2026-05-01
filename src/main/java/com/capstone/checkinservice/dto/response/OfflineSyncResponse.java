@@ -19,6 +19,12 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class OfflineSyncResponse {
     private String packageId;
+    private Long eventId;
+    private Long showtimeId;
+    private String gateId;
+    private String deviceId;
+    private OffsetDateTime syncedAt;
+    private Summary summary;
     private Integer acceptedCount;
     private Integer rejectedCount;
     private Integer failedCount;
@@ -33,9 +39,16 @@ public class OfflineSyncResponse {
     public static class SyncItemResult {
         private String localScanId;
         private Long ticketAssetId;
+        private String ticketCode;
+        private SyncResult syncStatus;
         private SyncResult syncResult;
+        private ScanResult resultCode;
         private ScanResult scanResultCode;
+        private String title;
+        private String message;
         private ResultMessage resultMessage;
+        private LocalContext local;
+        private ServerContext server;
         private ConflictDetails conflictDetails;
     }
 
@@ -53,5 +66,43 @@ public class OfflineSyncResponse {
         private String firstSuccessfulGateId;
         private Long firstSuccessfulCheckerId;
         private String firstSuccessfulDeviceId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class Summary {
+        private Integer total;
+        private Integer accepted;
+        private Integer rejected;
+        private Integer failed;
+        private Integer conflict;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class LocalContext {
+        private ScanResult resultCode;
+        private OffsetDateTime scannedAt;
+        private String gateId;
+        private String deviceId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ServerContext {
+        private ScanResult resultCode;
+        private OffsetDateTime usedAt;
+        private String usedAtGateId;
+        private Long usedByCheckerId;
+        private String usedByDeviceId;
     }
 }
