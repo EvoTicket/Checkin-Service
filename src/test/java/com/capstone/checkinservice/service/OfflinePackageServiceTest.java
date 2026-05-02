@@ -134,7 +134,9 @@ class OfflinePackageServiceTest {
         OfflinePackageResponse response = service.generateOfflinePackage(request());
 
         verify(ticketAccessStateRepository).findByEventIdAndShowtimeId(99L, 501L);
-        assertThat(response.getTicketSnapshots()).allSatisfy(snapshot -> {
+        assertThat(response.getTicketSnapshots())
+                .isNotEmpty()
+                .allSatisfy(snapshot -> {
             assertThat(snapshot.getEventId()).isEqualTo(99L);
             assertThat(snapshot.getShowtimeId()).isEqualTo(501L);
         });

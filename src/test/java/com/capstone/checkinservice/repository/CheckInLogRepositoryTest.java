@@ -70,6 +70,7 @@ class CheckInLogRepositoryTest {
     @Test
     void rawQrTokenFieldDoesNotExist() {
         assertThat(Arrays.stream(CheckInLog.class.getDeclaredFields()).map(Field::getName))
+                .isNotEmpty()
                 .doesNotContain("qrToken", "rawQrToken", "rawQrPayload");
     }
 
