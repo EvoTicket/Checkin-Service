@@ -34,10 +34,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(AdminCheckerDeviceController.class)
+@WebMvcTest(ManagementCheckerDeviceController.class)
 @Import({GlobalExceptionHandler.class, SecurityConfig.class})
 @AutoConfigureMockMvc
-class AdminCheckerDeviceControllerTest {
+class ManagementCheckerDeviceControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
@@ -48,12 +48,12 @@ class AdminCheckerDeviceControllerTest {
     private JwtDecoder jwtDecoder;
 
     @Test
-    void adminCanListPendingDevices() throws Exception {
+    void organizerCanListPendingDevices() throws Exception {
         when(checkerDeviceService.listPendingDevices()).thenReturn(List.of(
                 device("checker-device-b-02", CheckerDeviceStatus.PENDING, false, false)
         ));
 
-        mockMvc.perform(get("/api/v1/admin/checker/devices/pending").with(role("ADMIN")))
+        mockMvc.perform(get("/api/v1/management/checker/devices/pending").with(role("ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data[0].deviceId").value("checker-device-b-02"))
@@ -63,12 +63,32 @@ class AdminCheckerDeviceControllerTest {
     }
 
     @Test
-    void adminCanTrustDevice() throws Exception {
+    void adminCanListPendingDevices() throws Exception {
+        when(checkerDeviceService.listPendingDevices()).thenReturn(List.of(
+                device("checker-device-b-02", CheckerDeviceStatus.PENDING, false, false)
+        ));
+
+        mockMvc.perform(get("/api/v1/management/checker/devices/pending").with(role("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data[0].deviceId").value("checker-device-b-02"));
+    }
+
+    @Test
+    void checkerCannotListPendingDevices() throws Exception {
+        mockMvc.perform(get("/api/v1/management/checker/devices/pending").with(role("CHECKER")))
+                .andExpect(status().isForbidden());
+
+        verify(checkerDeviceService, never()).listPendingDevices();
+    }
+
+    @Test
+    void organizerCanTrustDevice() throws Exception {
         when(checkerDeviceService.trustDevice(eq("checker-device-b-02")))
                 .thenReturn(device("checker-device-b-02", CheckerDeviceStatus.TRUSTED, true, false));
 
-        mockMvc.perform(patch("/api/v1/admin/checker/devices/{deviceId}/trust", "checker-device-b-02")
-                        .with(role("ADMIN")))
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/trust", "checker-device-b-02")
+                        .with(role("ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.deviceId").value("checker-device-b-02"))
@@ -78,12 +98,33 @@ class AdminCheckerDeviceControllerTest {
     }
 
     @Test
-    void adminCanRevokeDevice() throws Exception {
+    void adminCanTrustDevice() throws Exception {
+        when(checkerDeviceService.trustDevice(eq("checker-device-b-02")))
+                .thenReturn(device("checker-device-b-02", CheckerDeviceStatus.TRUSTED, true, false));
+
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/trust", "checker-device-b-02")
+                        .with(role("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deviceId").value("checker-device-b-02"))
+                .andExpect(jsonPath("$.data.status").value("TRUSTED"));
+    }
+
+    @Test
+    void checkerCannotTrustDevice() throws Exception {
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/trust", "checker-device-b-02")
+                        .with(role("CHECKER")))
+                .andExpect(status().isForbidden());
+
+        verify(checkerDeviceService, never()).trustDevice(anyString());
+    }
+
+    @Test
+    void organizerCanRevokeDevice() throws Exception {
         when(checkerDeviceService.revokeDevice(eq("checker-device-b-02")))
                 .thenReturn(device("checker-device-b-02", CheckerDeviceStatus.REVOKED, false, true));
 
-        mockMvc.perform(patch("/api/v1/admin/checker/devices/{deviceId}/revoke", "checker-device-b-02")
-                        .with(role("ADMIN")))
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/revoke", "checker-device-b-02")
+                        .with(role("ORGANIZER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.deviceId").value("checker-device-b-02"))
@@ -93,17 +134,20 @@ class AdminCheckerDeviceControllerTest {
     }
 
     @Test
-    void checkerCannotTrustDevice() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/checker/devices/{deviceId}/trust", "checker-device-b-02")
-                        .with(role("CHECKER")))
-                .andExpect(status().isForbidden());
+    void adminCanRevokeDevice() throws Exception {
+        when(checkerDeviceService.revokeDevice(eq("checker-device-b-02")))
+                .thenReturn(device("checker-device-b-02", CheckerDeviceStatus.REVOKED, false, true));
 
-        verify(checkerDeviceService, never()).trustDevice(anyString());
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/revoke", "checker-device-b-02")
+                        .with(role("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deviceId").value("checker-device-b-02"))
+                .andExpect(jsonPath("$.data.status").value("REVOKED"));
     }
 
     @Test
     void checkerCannotRevokeDevice() throws Exception {
-        mockMvc.perform(patch("/api/v1/admin/checker/devices/{deviceId}/revoke", "checker-device-b-02")
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/revoke", "checker-device-b-02")
                         .with(role("CHECKER")))
                 .andExpect(status().isForbidden());
 
@@ -119,12 +163,18 @@ class AdminCheckerDeviceControllerTest {
                         "Device is not registered"
                 ));
 
-        mockMvc.perform(patch("/api/v1/admin/checker/devices/{deviceId}/trust", "missing-device")
-                        .with(role("ADMIN")))
+        mockMvc.perform(patch("/api/v1/management/checker/devices/{deviceId}/trust", "missing-device")
+                        .with(role("ORGANIZER")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Device is not registered"))
                 .andExpect(jsonPath("$.data.resultCode").value("DEVICE_NOT_ALLOWED"));
+    }
+
+    @Test
+    void oldAdminPendingRouteDoesNotExist() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/checker/devices/pending").with(role("ADMIN")))
+                .andExpect(status().isNotFound());
     }
 
     private RequestPostProcessor role(String role) {

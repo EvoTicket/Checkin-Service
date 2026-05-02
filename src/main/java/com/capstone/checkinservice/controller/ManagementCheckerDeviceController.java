@@ -20,14 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/admin/checker/devices")
+@RequestMapping("/api/v1/management/checker/devices")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CHECKER_SUPERVISOR', 'ROLE_ORGANIZER_MANAGER')")
+@PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
 @Tag(
-        name = "Admin Checker Devices",
-        description = "Admin APIs for approving and revoking checker devices"
+        name = "Management Checker Devices",
+        description = "Management APIs for approving and revoking checker devices"
 )
-public class AdminCheckerDeviceController {
+public class ManagementCheckerDeviceController {
     private final CheckerDeviceService checkerDeviceService;
 
     @GetMapping("/pending")

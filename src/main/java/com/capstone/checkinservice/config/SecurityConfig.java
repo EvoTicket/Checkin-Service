@@ -36,12 +36,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/tickets/*/qr-token")
                         .hasAnyAuthority("ROLE_USER", "ROLE_BUYER", "ROLE_ADMIN")
 
-                        .requestMatchers("/api/v1/admin/checker/**")
-                        .hasAnyAuthority(
-                                "ROLE_ADMIN",
-                                "ROLE_CHECKER_SUPERVISOR",
-                                "ROLE_ORGANIZER_MANAGER"
-                        )
+                        .requestMatchers("/api/v1/management/**")
+                        .hasAnyRole("ORGANIZER", "ADMIN")
 
                         .requestMatchers("/api/v1/checker/**")
                         .hasAnyAuthority(
