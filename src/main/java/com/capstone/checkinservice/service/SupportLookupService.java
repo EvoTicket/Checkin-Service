@@ -11,7 +11,7 @@ import com.capstone.checkinservice.exception.CheckinBusinessException;
 import com.capstone.checkinservice.repository.CheckInLogRepository;
 import com.capstone.checkinservice.repository.OfflineSyncItemRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,13 +30,13 @@ public class SupportLookupService {
     private final CheckInLogRepository checkInLogRepository;
     private final OfflineSyncItemRepository offlineSyncItemRepository;
     private final CheckerAssignmentService checkerAssignmentService;
-    private final CurrentUserProvider currentUserProvider;
     private final OwnerProfileProvider ownerProfileProvider;
     private final SupportMaskingService maskingService;
+    private final JwtUtil jwtUtil;
 
     @Transactional(readOnly = true)
     public OwnerInfoResponse getOwnerInfo(Long ticketAssetId) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         TicketAccessState ticket = ticketAccessStateRepository.findByTicketAssetId(ticketAssetId)
                 .orElseThrow(() -> new CheckinBusinessException(
                         ScanResult.TICKET_NOT_FOUND,

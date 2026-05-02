@@ -8,7 +8,7 @@ import com.capstone.checkinservice.enums.CheckerDeviceStatus;
 import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.exception.CheckinBusinessException;
 import com.capstone.checkinservice.repository.CheckerDeviceRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,12 +23,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CheckerDeviceService {
     private final CheckerDeviceRepository checkerDeviceRepository;
-    private final CurrentUserProvider currentUserProvider;
     private final Clock clock;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public CheckerDeviceResponse registerDevice(CheckerDeviceRegisterRequest request) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         Instant now = clock.instant();
         CheckerDevice device = createPendingDevice(checkerId, request, now);
         CheckerDevice saved = checkerDeviceRepository.save(device);
@@ -37,7 +37,7 @@ public class CheckerDeviceService {
 
     @Transactional(readOnly = true)
     public CheckerDeviceResponse getDevice(String deviceId) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         CheckerDevice device = checkerDeviceRepository.findByDeviceId(deviceId)
                 .orElseThrow(() -> notAllowed("Device is not registered"));
         assertOwnedByChecker(device, checkerId);
@@ -46,7 +46,7 @@ public class CheckerDeviceService {
 
     @Transactional(readOnly = true)
     public CheckerDeviceReadinessResponse getReadiness(String deviceId) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         Instant serverTime = clock.instant();
         return checkerDeviceRepository.findByDeviceId(deviceId)
                 .map(device -> readinessForExistingDevice(device, checkerId, serverTime))

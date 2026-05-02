@@ -5,7 +5,7 @@ import com.capstone.checkinservice.entity.CheckerAssignment;
 import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.exception.CheckinBusinessException;
 import com.capstone.checkinservice.repository.CheckerAssignmentRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,13 +29,13 @@ public class CheckerAssignmentService {
     };
 
     private final CheckerAssignmentRepository checkerAssignmentRepository;
-    private final CurrentUserProvider currentUserProvider;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final JwtUtil jwtUtil;
 
     @Transactional(readOnly = true)
     public CheckerAssignmentResponse getAssignmentsForCurrentChecker() {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         List<CheckerAssignmentResponse.Assignment> assignments = checkerAssignmentRepository
                 .findByCheckerIdAndActiveTrue(checkerId)
                 .stream()

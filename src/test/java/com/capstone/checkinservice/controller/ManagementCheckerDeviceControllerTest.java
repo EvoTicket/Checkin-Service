@@ -1,6 +1,5 @@
 package com.capstone.checkinservice.controller;
 
-import com.capstone.checkinservice.config.SecurityConfig;
 import com.capstone.checkinservice.dto.response.CheckerDeviceResponse;
 import com.capstone.checkinservice.enums.CheckerDeviceStatus;
 import com.capstone.checkinservice.enums.ScanResult;

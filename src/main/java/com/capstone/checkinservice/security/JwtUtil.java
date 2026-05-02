@@ -12,27 +12,18 @@ public class JwtUtil {
     private final HttpServletRequest request;
 
     public TokenMetaData getDataFromAuth() {
+        String token = null;
         String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            return new TokenMetaData(null, false, null);
+        if (header != null && header.startsWith("Bearer ")) {
+            token =header.substring(7);
         }
 
-        String token = header.substring(7);
-        if (token.isEmpty()) {
-            return new TokenMetaData(null, false, null);
-        }
+        Claims claims = jwtService.extractAllClaims(token);
+        Long userId = claims.get("userId", Long.class);
+        Boolean isOrganization = claims.get("isOrganization", Boolean.class);
+        Long organizationId = claims.get("organizationId", Long.class);
 
-        try {
-            Claims claims = jwtService.extractAllClaims(token);
-            Long userId = claims.get("userId", Long.class);
-            Boolean isOrg = claims.get("isOrganization", Boolean.class);
-            boolean isOrganization = isOrg != null && isOrg;
-            Long organizationId = claims.get("organizationId", Long.class);
-
-            return new TokenMetaData(userId, isOrganization, organizationId);
-        } catch (Exception e) {
-            return new TokenMetaData(null, false, null);
-        }
+        return new TokenMetaData(userId, isOrganization, organizationId);
     }
 
     public String getToken(){

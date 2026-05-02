@@ -20,7 +20,7 @@ public class OpenApiConfiguration {
     @Bean
     public OpenAPI customOpenAPI() {
         Server localServer = new Server()
-                .url("http://localhost:8087")
+                .url("/checkin-service")
                 .description("Local development server");
 
         Server gatewayServer = new Server()

@@ -9,7 +9,7 @@ import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.enums.TicketAccessStatus;
 import com.capstone.checkinservice.exception.CheckinBusinessException;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,8 +27,8 @@ public class BuyerQrService {
     private final TicketAccessStateRepository ticketAccessStateRepository;
     private final QrTokenSigner qrTokenSigner;
     private final QrTokenProperties qrTokenProperties;
-    private final CurrentUserProvider currentUserProvider;
     private final Clock clock;
+    private final JwtUtil jwtUtil;
 
     @Transactional(readOnly = true)
     public QrTokenResponse issueQrToken(Long ticketAssetId) {
@@ -40,7 +40,7 @@ public class BuyerQrService {
             );
         }
 
-        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Long currentUserId = jwtUtil.getDataFromAuth().userId();
         TicketAccessState ticket = ticketAccessStateRepository.findByTicketAssetId(ticketAssetId)
                 .orElseThrow(() -> new CheckinBusinessException(
                         ScanResult.TICKET_NOT_FOUND,

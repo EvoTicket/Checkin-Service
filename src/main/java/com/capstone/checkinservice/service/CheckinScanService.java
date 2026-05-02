@@ -18,7 +18,7 @@ import com.capstone.checkinservice.enums.TicketAccessStatus;
 import com.capstone.checkinservice.mapper.ScanResultMessageMapper;
 import com.capstone.checkinservice.repository.CheckInLogRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,13 +38,13 @@ public class CheckinScanService {
     private final QrTokenVerifier qrTokenVerifier;
     private final CheckerAssignmentService checkerAssignmentService;
     private final CheckerDeviceValidationService checkerDeviceValidationService;
-    private final CurrentUserProvider currentUserProvider;
     private final CheckerDeviceProperties checkerDeviceProperties;
     private final Clock clock;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public ScanResultResponse scanOnline(OnlineScanRequest request) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         checkerAssignmentService.assertCheckerAssigned(
                 checkerId,
                 request.getEventId(),

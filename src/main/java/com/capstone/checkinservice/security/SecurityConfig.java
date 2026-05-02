@@ -48,17 +48,31 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/swagger-ui/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**").permitAll()
-                        .requestMatchers("/api-docs/**").permitAll()
-                        .requestMatchers("/swagger-ui.html").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/info"
+                        ).permitAll()
 
-                        .requestMatchers("/api/internal/**").hasRole("INTERNAL_SERVICE")
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/webjars/**"
+                        ).permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/locations/**").permitAll()
-                        .requestMatchers(HttpMethod.GET,"/api/events/**").permitAll()
+                        .requestMatchers("/api/v1/tickets/*/qr-token")
+                        .hasAnyRole("USER", "BUYER", "ADMIN")
+
+                        .requestMatchers("/api/v1/management/**")
+                        .hasAnyRole("ORGANIZER", "ADMIN")
+
+                        .requestMatchers("/api/v1/checker/**")
+                        .hasAnyRole(
+                                "CHECKER",
+                                "CHECKER_SUPERVISOR",
+                                "ADMIN",
+                                "SUPPORT"
+                        )
 
                         .anyRequest().authenticated()
                 )

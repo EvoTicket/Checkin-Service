@@ -1,8 +1,10 @@
 package com.capstone.checkinservice.exception;
 
 import com.capstone.checkinservice.enums.ScanResult;
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public class CheckinBusinessException extends RuntimeException {
     private final ScanResult resultCode;
     private final HttpStatus status;
@@ -13,11 +15,4 @@ public class CheckinBusinessException extends RuntimeException {
         this.status = status;
     }
 
-    public ScanResult getResultCode() {
-        return resultCode;
-    }
-
-    public HttpStatus getStatus() {
-        return status;
-    }
 }

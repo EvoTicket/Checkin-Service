@@ -1,83 +1,212 @@
 package com.capstone.checkinservice.exception;
 
-import com.capstone.checkinservice.crypto.exception.QrTokenException;
-import com.capstone.checkinservice.dto.common.BaseResponse;
-import com.capstone.checkinservice.dto.common.ResultMessage;
-import com.capstone.checkinservice.mapper.ScanResultMessageMapper;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(CheckinBusinessException.class)
-    public ResponseEntity<BaseResponse<ResultMessage>> handleBusinessException(CheckinBusinessException exception) {
-        ResultMessage resultMessage = ScanResultMessageMapper.toMessage(exception.getResultCode());
-        return ResponseEntity
-                .status(exception.getStatus())
-                .body(BaseResponse.of(exception.getStatus().value(), exception.getMessage(), resultMessage));
-    }
 
-    @ExceptionHandler(QrTokenException.class)
-    public ResponseEntity<BaseResponse<ResultMessage>> handleQrTokenException(QrTokenException exception) {
-        ResultMessage resultMessage = ScanResultMessageMapper.toMessage(exception.getResultCode());
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(BaseResponse.of(HttpStatus.BAD_REQUEST.value(), exception.getMessage(), resultMessage));
-    }
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ErrorResponse> handleAppException(AppException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ex.getErrorCode();
 
-    @ExceptionHandler({
-            MethodArgumentNotValidException.class,
-            MethodArgumentTypeMismatchException.class,
-            IllegalArgumentException.class
-    })
-    public ResponseEntity<BaseResponse<ResultMessage>> handleBadRequest(Exception exception) {
-        ResultMessage resultMessage = ResultMessage.builder()
-                .title("Invalid request")
-                .message(exception.getMessage())
-                .severity("ERROR")
-                .admitAllowed(false)
-                .supportRequired(false)
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message(ex.getCustomMessage() != null ? ex.getCustomMessage() : errorCode.getDefaultMessage())
+                .path(request.getRequestURI())
                 .build();
-        return ResponseEntity
-                .badRequest()
-                .body(BaseResponse.of(HttpStatus.BAD_REQUEST.value(), "Invalid request", resultMessage));
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
     }
 
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<BaseResponse<ResultMessage>> handleNotFound(NoResourceFoundException exception) {
-        ResultMessage resultMessage = ResultMessage.builder()
-                .title("Not found")
-                .message(exception.getMessage())
-                .severity("ERROR")
-                .admitAllowed(false)
-                .supportRequired(false)
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentialsException(HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.BAD_CREDENTIALS;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message(errorCode.getDefaultMessage())
+                .path(request.getRequestURI())
                 .build();
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(BaseResponse.of(HttpStatus.NOT_FOUND.value(), "Not found", resultMessage));
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ValidationErrorResponse> handleValidationExceptions(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
+
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
+
+        ValidationErrorResponse errorResponse = ValidationErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message(errorCode.getDefaultMessage())
+                .path(request.getRequestURI())
+                .validationErrors(errors)
+                .build();
+
+        return new ResponseEntity<>(errorResponse, errorCode.getStatus());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<BaseResponse<ResultMessage>> handleUnexpected(Exception exception, HttpServletRequest request) {
-        ResultMessage resultMessage = ResultMessage.builder()
-                .title("Internal server error")
-                .message("An unexpected error occurred.")
-                .severity("ERROR")
-                .admitAllowed(false)
-                .supportRequired(true)
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
                 .build();
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(BaseResponse.of(
-                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                        "Internal server error",
-                        resultMessage
-                ));
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<ErrorResponse> handleIOException(IOException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.IO_EXCEPTION;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message(ex.getMessage() != null ? ex.getMessage() : errorCode.getDefaultMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.MAX_UPLOAD_SIZE_EXCEEDED;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase() + " " + ex.getMessage())
+                .code(errorCode.getCode())
+                .message(errorCode.getDefaultMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message("Phương thức HTTP không được hỗ trợ cho endpoint này." + " " + ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.MISSING_PARAM;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message("Thiếu tham số: " + ex.getParameterName())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.DATA_INTEGRITY_VIOLATION;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message("Dữ liệu không hợp lệ hoặc vi phạm ràng buộc trong cơ sở dữ liệu." + " " + ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.BAD_JSON;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message("Dữ liệu đầu vào không hợp lệ hoặc không đọc được JSON." + " " + ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipart(MultipartException ex, HttpServletRequest request) {
+        ErrorCode errorCode = ErrorCode.FILE_UPLOAD_ERROR;
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(ZoneOffset.ofHours(7)))
+                .status(errorCode.getStatus().value())
+                .error(errorCode.getStatus().getReasonPhrase())
+                .code(errorCode.getCode())
+                .message("Lỗi khi upload file. Vui lòng kiểm tra định dạng hoặc dung lượng." + " " + ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(error, errorCode.getStatus());
     }
 }

@@ -12,7 +12,7 @@ import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.exception.CheckinBusinessException;
 import com.capstone.checkinservice.repository.OfflinePackageRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -40,15 +40,15 @@ public class OfflinePackageService {
     private final OfflinePackageRepository offlinePackageRepository;
     private final CheckerAssignmentService checkerAssignmentService;
     private final CheckerDeviceValidationService checkerDeviceValidationService;
-    private final CurrentUserProvider currentUserProvider;
     private final QrKeyProvider qrKeyProvider;
     private final OfflinePackageProperties offlinePackageProperties;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public OfflinePackageResponse generateOfflinePackage(OfflinePackageRequest request) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         String gateId = normalize(request.getGateId());
         String deviceId = normalize(request.getDeviceId());
 

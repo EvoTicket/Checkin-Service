@@ -23,7 +23,7 @@ import com.capstone.checkinservice.repository.CheckInLogRepository;
 import com.capstone.checkinservice.repository.OfflinePackageRepository;
 import com.capstone.checkinservice.repository.OfflineSyncItemRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
-import com.capstone.checkinservice.security.CurrentUserProvider;
+import com.capstone.checkinservice.security.JwtUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -51,13 +51,13 @@ public class OfflineSyncService {
     private final QrTokenVerifier qrTokenVerifier;
     private final CheckerAssignmentService checkerAssignmentService;
     private final CheckerDeviceValidationService checkerDeviceValidationService;
-    private final CurrentUserProvider currentUserProvider;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public OfflineSyncResponse syncOfflineScans(OfflineSyncRequest request) {
-        Long checkerId = currentUserProvider.getCurrentUserId();
+        Long checkerId = jwtUtil.getDataFromAuth().userId();
         String batchGateId = normalize(request.getGateId());
         String batchDeviceId = normalize(request.getDeviceId());
         Instant syncedAt = clock.instant();
