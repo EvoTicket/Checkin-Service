@@ -14,7 +14,7 @@ import java.io.IOException;
 @Slf4j
 public class SwaggerLauncher {
 
-    @Value("${swagger.host-url:http://localhost:8087}")
+    @Value("${swagger.host-url:http://localhost:8088}")
     private String hostUrl;
 
     @EventListener(ApplicationReadyEvent.class)
