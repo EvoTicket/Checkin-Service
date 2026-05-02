@@ -1,3 +1,4 @@
+
 package com.capstone.checkinservice.config;
 
 import io.swagger.v3.oas.models.Components;
@@ -13,18 +14,25 @@ import java.util.List;
 
 @Configuration
 public class OpenApiConfiguration {
+
     private static final String SECURITY_SCHEME_NAME = "bearerAuth";
+
     @Bean
     public OpenAPI customOpenAPI() {
+        Server localServer = new Server()
+                .url("http://localhost:8087")
+                .description("Local development server");
+
         Server gatewayServer = new Server()
                 .url("/checkin-service")
                 .description("Through API Gateway");
+
         return new OpenAPI()
                 .info(new Info()
-                        .title("IAM Service")
+                        .title("Checkin Service API")
                         .version("1.0")
-                        .description("Documentation for Checkin services"))
-                .servers(List.of(gatewayServer))
+                        .description("Documentation for Dynamic QR, checker assignment, device readiness, online check-in, offline package, offline sync, and conflict handling."))
+                .servers(List.of(localServer, gatewayServer))
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME))
                 .components(new Components()
                         .addSecuritySchemes(SECURITY_SCHEME_NAME, new SecurityScheme()

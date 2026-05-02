@@ -47,6 +47,14 @@ spring:
 swagger:
   host-url: http://localhost:${server.port}
 
+app:
+  seed:
+    enabled: false
+  qr:
+    key-id: ${QR_KEY_ID}
+    private-key-base64: ${QR_PRIVATE_KEY_BASE64}
+    public-key-base64: ${QR_PUBLIC_KEY_BASE64}
+
 eureka:
   client:
     service-url:

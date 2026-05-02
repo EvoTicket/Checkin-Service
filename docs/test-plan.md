@@ -1,0 +1,392 @@
+# Checkin-Service Test Plan
+
+## Overall Strategy
+
+Testing should protect the admission contract, QR security, concurrency behavior, and offline conflict handling. The service must be tested at four levels:
+
+- Unit tests for pure validation, QR crypto, result mapping, and DTO behavior.
+- Repository tests for persistence, constraints, and atomic updates.
+- API tests for request/response contracts, auth, and validation.
+- Integration/concurrency tests for double scan and offline sync behavior.
+
+Stable enum result codes are the contract. Tests should assert enum names and JSON values directly.
+
+## Unit Tests
+
+### Result codes and mapping
+
+- Every required result code exists.
+- Result codes serialize as exact strings.
+- UI title/message mapper returns deterministic text for each code.
+- Free-form message changes do not change the enum source of truth.
+
+### Gate policy validation
+
+- Missing gate policy skips/defaults gate validation.
+- Empty gate policy skips/defaults gate validation.
+- Present `allowedGateIds` containing current `gateId` passes.
+- Present `allowedGateIds` missing current `gateId` returns `WRONG_GATE`.
+- `CheckInLog` model always captures actual `gateId` when provided.
+
+## QR Crypto Tests
+
+Test class target: QR signer/verifier service when Task 4 is implemented.
+
+Required cases:
+
+- Sign and verify success.
+- Expired token is rejected with `QR_EXPIRED`.
+- Tampered payload is rejected with `INVALID_SIGNATURE`.
+- Tampered header/key id is rejected with `INVALID_SIGNATURE` or `INVALID_QR`.
+- Wrong key is rejected.
+- Invalid token format is rejected with `INVALID_QR`.
+- Missing `ticketAssetId`, `eventId`, `showtimeId`, `qrVersion`, `issuedAt`, `expiresAt`, or `jti` is rejected.
+- `jti` is preserved after parsing.
+- `qrVersion` is preserved after parsing.
+- Signature is verified over header plus payload; signature is not treated as a payload field.
+- Private key is not exposed by key provider API or offline package DTO.
+
+## Buyer QR Issuing Tests
+
+Endpoint target: `GET /api/v1/tickets/{ticketAssetId}/qr-token`.
+
+Required cases:
+
+- Valid current owner can request QR.
+- Non-owner is rejected.
+- Missing ticket projection returns `TICKET_NOT_FOUND`.
+- `USED` ticket is rejected with `ALREADY_USED`.
+- `LOCKED_RESALE` ticket is rejected with `LOCKED_RESALE`.
+- `CANCELLED` ticket is rejected with `CANCELLED`.
+- Ownership cannot be verified returns an auth/ownership failure and does not issue QR.
+- Response includes `expiresAt` and `refreshAfterSeconds`.
+- Returned token verifies.
+- Returned token payload contains expected claims.
+- Returned token envelope uses header/metadata, payload claims, and signature.
+- Raw secret seed is never returned.
+
+## Checker Assignment And Device Management Tests
+
+Endpoint targets:
+
+- `GET /api/v1/checker/assignments`
+- `POST /api/v1/checker/devices/register`
+- `GET /api/v1/checker/devices/{deviceId}`
+- `GET /api/v1/checker/devices/{deviceId}/readiness`
+- `GET /api/v1/management/checker/devices/pending`
+- `PATCH /api/v1/management/checker/devices/{deviceId}/trust`
+- `PATCH /api/v1/management/checker/devices/{deviceId}/revoke`
+
+Required cases:
+
+- Current checker receives active, currently valid assignments only.
+- Inactive assignments are not returned.
+- Future or expired assignments are not returned.
+- Assignment validation passes for matching event, showtime, and allowed gate.
+- Assignment validation passes when allowed gate policy is empty.
+- Assignment validation rejects wrong event, wrong showtime, wrong gate, and missing gate when assignment is gate-specific.
+- Invalid checker scope returns `UNAUTHORIZED_CHECKER`.
+- `allowedGateIds` JSON array parsing handles values such as `["A1","A2"]`.
+- Device registration creates a new device with server-generated `deviceId`.
+- Device registration creates `PENDING`/`trusted=false` devices by default.
+- Device registration does not accept client-provided device id as trust proof.
+- Device status works for owner checker.
+- Another checker's device is rejected.
+- Trusted device is accepted by validation service.
+- Revoked device is rejected by validation service.
+- Untrusted/PENDING device is rejected by validation service.
+- Readiness returns registered, trusted, revoked, server time, checker id, and device id.
+- Readiness rejects a device owned by another checker.
+- Revoked device readiness returns `revoked=true`.
+- Device readiness does not attempt backend camera, browser, or network tests.
+- Management pending list returns only `trusted=false` and `revokedAt=null` devices.
+- Management pending list excludes trusted devices.
+- Management pending list excludes revoked devices.
+- Management pending list orders devices by `registeredAt` descending.
+- Management trust uses external/business `deviceId`, not database primary key `id`.
+- Management trust sets `trusted=true`, `trustedAt` to current server time, and `revokedAt=null`.
+- Management revoke uses external/business `deviceId`, not database primary key `id`.
+- Management revoke sets `trusted=false` and `revokedAt` to current server time.
+- Unknown management `deviceId` returns a clear business error.
+- `CHECKER` cannot trust or revoke any device, including their own device.
+- `ORGANIZER` and `ADMIN` can trust and revoke checker devices through the management API.
+- MVP organizer scope validation allows `ORGANIZER` approval/revocation until event/organization ownership is modeled.
+
+## Online Scan Tests
+
+Endpoint target: `POST /api/v1/checker/scan`.
+
+Task 7 coverage status: implemented with service unit tests, controller envelope tests, existing repository conditional-update tests, and a lightweight concurrent double-scan service test.
+
+Required cases:
+
+- Valid scan marks ticket `USED`.
+- Valid scan sets `usedAt`.
+- Valid scan sets `usedByCheckerId`.
+- Valid scan sets `usedAtGateId` when gate is provided.
+- Valid scan creates `CheckInLog` with `scanMode=ONLINE`.
+- Valid scan returns `VALID_CHECKED_IN`.
+- Second scan returns `ALREADY_USED`.
+- Expired QR returns `QR_EXPIRED`.
+- Invalid format returns `INVALID_QR`.
+- Invalid signature returns `INVALID_SIGNATURE`.
+- Wrong event returns `WRONG_EVENT`.
+- Wrong showtime returns `WRONG_SHOWTIME`.
+- Wrong gate returns `WRONG_GATE`.
+- QR version mismatch returns `INVALID_QR_VERSION`.
+- `LOCKED_RESALE` returns `LOCKED_RESALE`.
+- `CANCELLED` returns `CANCELLED`.
+- Unknown ticket returns `TICKET_NOT_FOUND`.
+- Unassigned checker returns `UNAUTHORIZED_CHECKER`.
+- Device time outside tolerance returns `DEVICE_TIME_INVALID` when time validation is active.
+- Provided device id must be registered, trusted, non-revoked, and owned by the current checker.
+- Revoked, pending/untrusted, wrong-checker, and unknown devices are rejected.
+- Missing device id follows `checkin.checker.device.required-for-online-scan`; default is false.
+- `X-Device-Id` and body `deviceId` mismatch returns `DEVICE_MISMATCH`.
+- QR token with `issuedAt` too far in the future returns `INVALID_QR`.
+- Malformed gate policy returns `WRONG_GATE` or equivalent fail-closed result.
+
+Task 7 notes:
+
+- Device time tolerance is not active in the current MVP service logic, so `DEVICE_TIME_INVALID` remains documented for the later time-validation task.
+- The concurrent double-scan test verifies that only one request can receive `VALID_CHECKED_IN` when the conditional update succeeds once and the losing scan reloads current state as `ALREADY_USED`.
+- The raw QR token storage check is covered by `CheckInLog` model tests and online scan log assertions that store only QR `jti`.
+
+## Double Scan and Concurrency Tests
+
+Repository/service target: atomic check-in update.
+
+Required cases:
+
+- Two concurrent scan requests for the same valid ticket allow exactly one `VALID_CHECKED_IN`.
+- Losing request returns `ALREADY_USED` after state reload.
+- Concurrent scan with stale `qrVersion` returns `INVALID_QR_VERSION`.
+- Conditional update affects exactly one row for a valid ticket.
+- Conditional update affects zero rows for `USED`, `LOCKED_RESALE`, `CANCELLED`, or mismatched `qrVersion`.
+- `CheckInLog` records both attempts with their final result codes.
+
+Implementation guidance:
+
+- Use a real database integration test where possible.
+- If using Testcontainers later, run PostgreSQL to test actual transaction behavior.
+- If Testcontainers is not added yet, use repository tests plus service-level concurrency tests with controlled synchronization.
+
+## Offline Package Tests
+
+Endpoint target: `POST /api/v1/checker/offline-packages`.
+
+Task 8 coverage status: implemented with service unit tests, controller envelope tests, repository scope-query tests, and enum/result mapping coverage.
+
+Required cases:
+
+- Package is created for assigned checker/device scope.
+- Package only includes tickets for requested `eventId`.
+- Package only includes tickets for requested `showtimeId`.
+- Package only includes gate-allowed tickets when `gateId` is provided.
+- Unassigned checker cannot create package.
+- Package has `issuedAt` and `validUntil`.
+- Package includes public verification key or key id/version.
+- Package includes `ticketAssetId`, `ticketCode`, `ticketTypeName`, `zoneLabel`, `seatLabel`, `qrVersion`, `accessStatus`, `usedAt`, and gate permission snapshot.
+- Package does not contain private signing key.
+- Package does not contain raw QR secret.
+- Package does not contain JWT secret.
+- Package does not contain full email or phone.
+- Package checksum verifies.
+- Package signature verifies when package-signing key infrastructure exists.
+- Unknown device cannot generate package.
+- PENDING/untrusted device cannot generate package.
+- Revoked device cannot generate package.
+- Another checker's device cannot generate package.
+- Missing device id cannot generate package.
+- Package response includes `keyAlgorithm` when public key is exposed.
+- Ticket snapshots include `usedAtGateId`.
+- Package response does not expose raw `gatePolicySnapshot`.
+- Malformed gate policy does not become unrestricted.
+
+Task 8 notes:
+
+- Package signature is intentionally null in the current implementation because there is no dedicated package-signing key infrastructure yet.
+- Checksum generation is tested for presence and persisted metadata. Exact checksum recomputation can be added when a shared package verification utility exists.
+- Public QR verification key exposure is tested as non-empty response metadata; private key and raw QR token exposure are covered by JSON safety assertions.
+- Max snapshot count enforcement is covered with `OFFLINE_PACKAGE_TOO_LARGE`.
+- Trusted device enforcement is covered by `CheckerDeviceValidationServiceTest` and offline package service tests.
+
+## Offline Local Validation Test Scenarios
+
+These tests may live in frontend/mobile code later, but backend contract tests should document expected behavior.
+
+Required scenarios:
+
+- Package missing returns `OFFLINE_PACKAGE_NOT_FOUND`.
+- Package expired returns `OFFLINE_PACKAGE_EXPIRED`.
+- Device time invalid returns `DEVICE_TIME_INVALID`.
+- QR token signature verifies with package public key/key version.
+- QR expiration is checked against local `scannedAt`.
+- Ticket not in package is rejected.
+- Event mismatch returns `WRONG_EVENT`.
+- Showtime mismatch returns `WRONG_SHOWTIME`.
+- Gate mismatch returns `WRONG_GATE`.
+- QR version mismatch returns `INVALID_QR_VERSION`.
+- Snapshot status other than `VALID` is rejected.
+- Ticket already used locally on same device returns local already-used state.
+- Accepted local scan creates pending sync item with `OFFLINE_ACCEPTED_PENDING_SYNC`.
+
+## Offline Sync Tests
+
+Endpoint target: `POST /api/v1/checker/offline-sync`.
+
+Task 9 coverage status: implemented with service unit tests for classification, idempotency, logging, and atomic-update conflict handling, plus controller envelope tests.
+
+Required cases:
+
+- Accepted sync marks ticket `USED`.
+- Accepted sync writes `CheckInLog` with sync metadata.
+- Accepted sync returns `SYNC_ACCEPTED`.
+- Already used by another device returns `SYNC_CONFLICT`.
+- Conflict response includes local result, server result, local scannedAt, current gate, first successful server check-in if available, and checker/device metadata if available.
+- Cancelled ticket returns `SYNC_REJECTED`.
+- Locked resale ticket returns `SYNC_REJECTED`.
+- Wrong event returns `SYNC_REJECTED` with `WRONG_EVENT`.
+- Wrong showtime returns `SYNC_REJECTED` with `WRONG_SHOWTIME`.
+- Wrong gate returns `SYNC_REJECTED` with `WRONG_GATE`.
+- Malformed item returns `SYNC_FAILED` or validation error according to API design.
+- Package not found returns `OFFLINE_PACKAGE_NOT_FOUND`.
+- Package expired returns `OFFLINE_PACKAGE_EXPIRED` unless policy allows historical sync for packages valid at `scannedAt`; this policy must be explicit before implementation.
+- QR expiration is checked at item `scannedAt`, not current server time.
+- Sync summary counts accepted, rejected, failed, and conflict items correctly.
+- Duplicate `(packageId, localScanId)` is idempotent.
+
+Task 9 notes:
+
+- QR expiration is verified at item `scannedAt` by passing that timestamp to the QR verifier.
+- Invalid QR format is classified as `SYNC_FAILED`; invalid signature and expired QR are classified as `SYNC_REJECTED`.
+- Already-used state after local offline acceptance is classified as `SYNC_CONFLICT`.
+- The focused service tests cover accepted, log creation, summary counts, conflict with server used context, cancelled, locked resale, wrong event, wrong showtime, wrong gate, QR version mismatch, QR expired, invalid signature, malformed item, invalid QR format, mixed batches, duplicate retry, raw QR non-storage, and unassigned checker denial.
+- Atomic update race behavior is covered by the failed conditional update path reloading a `USED` ticket as `SYNC_CONFLICT`. Full multi-threaded repository-backed offline sync concurrency can be added when a database concurrency test harness is introduced.
+
+## Repository Tests
+
+Required cases:
+
+- `ticket_access_state.ticket_asset_id` is unique.
+- `offline_package.package_id` is unique.
+- `checker_device.device_id` is unique.
+- `offline_sync_item(package_id, local_scan_id)` is unique.
+- `ticket_access_state` can be queried by owner for QR issuing.
+- `ticket_access_state` can be queried by event/showtime/status for offline package generation.
+- `check_in_log` can be queried by ticket for support lookup.
+- Conditional `VALID` to `USED` update succeeds only once.
+
+## API Tests
+
+Required cases:
+
+- Buyer QR endpoint requires authentication.
+- Checker assignment endpoint requires checker authorization.
+- Scan endpoint requires checker authorization.
+- Offline package endpoint requires checker authorization.
+- Offline sync endpoint requires checker authorization.
+- Owner-info endpoint masks PII.
+- Validation errors return structured error response.
+- Every scan API response includes stable `resultCode`.
+- HTTP status does not replace result code for business outcomes. For example, `ALREADY_USED` may be `200` with a non-success result code, while malformed requests may be `400`.
+
+## Support Lookup Tests
+
+Endpoint target: `GET /api/v1/checker/tickets/{ticketAssetId}/owner-info`.
+
+Task 10 coverage status: implemented with masking unit tests, support lookup service tests, and controller envelope tests.
+
+Required cases:
+
+- Owner-info returns ticket summary for an assigned checker.
+- Owner-info rejects an unassigned checker with `UNAUTHORIZED_CHECKER`.
+- Owner-info returns `supportOnly=true`.
+- Owner-info returns `canOverride=false`.
+- Owner-info masks email when profile data is available.
+- Owner-info masks phone when profile data is available.
+- Owner-info returns a masked owner reference when Checkin-Service has no local owner profile.
+- Owner-info does not expose raw QR token, private key, JWT/internal secret, or payment details.
+- Owner-info includes latest successful check-in context when ticket is `USED`.
+- Owner-info includes recent scan attempts.
+- Owner-info maps `USED` to `ALREADY_USED` support context.
+- Owner-info maps `LOCKED_RESALE` support context.
+- Owner-info maps `CANCELLED` support context.
+- Owner-info maps `SYNC_CONFLICT` support context when a conflict log or offline sync item exists.
+- Optional lookup by `ticketCode` is not implemented in Task 10 and remains a future extension.
+
+## API Documentation Review Checklist
+
+Review this checklist for every task that creates or changes controllers:
+
+- Every controller has `@Tag` from `io.swagger.v3.oas.annotations.tags.Tag`.
+- Every endpoint has `@Operation` with a concise summary and business-oriented description.
+- Transport-level errors have `@ApiResponses` where appropriate, including 400, 401, 403, 404, and 500.
+- Business outcomes are represented by stable `resultCode` fields in the response body.
+- HTTP status represents request, transport, authentication, authorization, and system status.
+- Scan business-denied outcomes such as `ALREADY_USED`, `WRONG_GATE`, `QR_EXPIRED`, `INVALID_QR_VERSION`, `LOCKED_RESALE`, and `CANCELLED` are not documented as HTTP-status-only outcomes.
+- No Swagger tag is created for an individual result state.
+- Tags remain grouped by business capability: `Buyer QR`, `Checker Assignments`, `Checker Scan`, `Offline Package`, `Offline Sync`, and `Checker Support`.
+
+## Security and Privacy Tests
+
+Required cases:
+
+- Private QR signing key is loaded from environment/config, not hardcoded.
+- JWT secret is not logged or returned.
+- Raw QR token is not stored in `CheckInLog`.
+- `jti` is stored instead of raw token.
+- Offline package does not contain private key, raw secret, JWT secret, full email, or full phone.
+- Owner info masks email and phone.
+- Support lookup does not expose override or manual admission actions.
+- Unassigned checker cannot scan event/showtime/gate.
+- Revoked/untrusted device cannot download offline package if device trust is enabled.
+
+## Manual Test Checklist
+
+Buyer QR:
+
+- Buyer opens a valid ticket and sees active QR.
+- QR refreshes before expiry.
+- Network lost state is shown when QR refresh fails.
+- Used, locked resale, cancelled, and transferred/no-longer-owner states are shown.
+
+Checker online:
+
+- Checker sees assigned events.
+- Valid online scan returns checked-in state.
+- Second scan returns already-used state.
+- Wrong event/showtime/gate states are visible.
+- Expired QR and invalid signature states are visible.
+
+Offline:
+
+- Checker downloads package while online.
+- Offline scan accepts valid ticket as pending sync.
+- Offline package expired state is visible.
+- Device time invalid state is visible.
+- Sync queue shows pending items.
+- Sync accepted, rejected, failed, and conflict states are visible.
+
+Support:
+
+- Owner info is masked.
+- Support lookup does not provide manual admission.
+
+## Commands To Run
+
+Windows:
+
+```powershell
+.\gradlew.bat clean test
+.\gradlew.bat bootJar
+```
+
+Unix/macOS:
+
+```bash
+./gradlew clean test
+./gradlew bootJar
+```
+
+For docs-only changes, tests are optional, but the baseline test command should still pass before starting Task 1 implementation.
