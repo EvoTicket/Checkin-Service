@@ -63,14 +63,62 @@ class CheckerDeviceRepositoryTest {
                 .containsExactly("device-abc");
     }
 
+    @Test
+    void findPendingDevicesReturnsUntrustedNonRevokedOrderedByRegisteredAtDescending() {
+        repository.saveAndFlush(device(
+                "pending-old",
+                7001L,
+                false,
+                Instant.parse("2026-05-01T08:00:00Z"),
+                null
+        ));
+        repository.saveAndFlush(device(
+                "pending-new",
+                7002L,
+                false,
+                Instant.parse("2026-05-01T09:00:00Z"),
+                null
+        ));
+        repository.saveAndFlush(device(
+                "trusted-device",
+                7003L,
+                true,
+                Instant.parse("2026-05-01T10:00:00Z"),
+                null
+        ));
+        repository.saveAndFlush(device(
+                "revoked-device",
+                7004L,
+                false,
+                Instant.parse("2026-05-01T11:00:00Z"),
+                Instant.parse("2026-05-01T11:30:00Z")
+        ));
+
+        assertThat(repository.findByTrustedFalseAndRevokedAtIsNullOrderByRegisteredAtDesc())
+                .extracting(CheckerDevice::getDeviceId)
+                .containsExactly("pending-new", "pending-old");
+    }
+
     private CheckerDevice device(String deviceId, Long checkerId, boolean trusted) {
+        return device(deviceId, checkerId, trusted, null, null);
+    }
+
+    private CheckerDevice device(
+            String deviceId,
+            Long checkerId,
+            boolean trusted,
+            Instant registeredAt,
+            Instant revokedAt
+    ) {
         return CheckerDevice.builder()
                 .deviceId(deviceId)
                 .checkerId(checkerId)
                 .deviceName("Gate phone")
                 .platform("WEB")
+                .registeredAt(registeredAt)
                 .lastSeenAt(Instant.parse("2026-05-01T08:00:00Z"))
                 .trusted(trusted)
+                .revokedAt(revokedAt)
                 .build();
     }
 }

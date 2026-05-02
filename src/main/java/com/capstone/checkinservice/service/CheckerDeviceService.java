@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -59,6 +60,14 @@ public class CheckerDeviceService {
                         .serverTime(TimeMapper.toOffsetDateTime(serverTime))
                         .message("Device is not registered.")
                         .build());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CheckerDeviceResponse> listPendingDevices() {
+        return checkerDeviceRepository.findByTrustedFalseAndRevokedAtIsNullOrderByRegisteredAtDesc()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional

@@ -73,6 +73,9 @@ Endpoint targets:
 - `POST /api/v1/checker/devices/register`
 - `GET /api/v1/checker/devices/{deviceId}`
 - `GET /api/v1/checker/devices/{deviceId}/readiness`
+- `GET /api/v1/management/checker/devices/pending`
+- `PATCH /api/v1/management/checker/devices/{deviceId}/trust`
+- `PATCH /api/v1/management/checker/devices/{deviceId}/revoke`
 
 Required cases:
 
@@ -96,6 +99,18 @@ Required cases:
 - Readiness rejects a device owned by another checker.
 - Revoked device readiness returns `revoked=true`.
 - Device readiness does not attempt backend camera, browser, or network tests.
+- Management pending list returns only `trusted=false` and `revokedAt=null` devices.
+- Management pending list excludes trusted devices.
+- Management pending list excludes revoked devices.
+- Management pending list orders devices by `registeredAt` descending.
+- Management trust uses external/business `deviceId`, not database primary key `id`.
+- Management trust sets `trusted=true`, `trustedAt` to current server time, and `revokedAt=null`.
+- Management revoke uses external/business `deviceId`, not database primary key `id`.
+- Management revoke sets `trusted=false` and `revokedAt` to current server time.
+- Unknown management `deviceId` returns a clear business error.
+- `CHECKER` cannot trust or revoke any device, including their own device.
+- `ORGANIZER` and `ADMIN` can trust and revoke checker devices through the management API.
+- MVP organizer scope validation allows `ORGANIZER` approval/revocation until event/organization ownership is modeled.
 
 ## Online Scan Tests
 

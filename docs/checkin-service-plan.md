@@ -166,7 +166,7 @@ Device lifecycle:
 - `TRUSTED`: device is trusted and not revoked. It can download offline packages and can be used for strict checker flows.
 - `REVOKED`: device is blocked from offline package generation and from checker-sensitive operations when device validation is enabled.
 
-Device id is an identifier, not proof by itself. The trusted server-side record is the source of permission. Public checker APIs do not allow self-trust; trust/revoke is a future admin/organizer/internal workflow, with service methods available for seed/test/admin use.
+Device id is an identifier, not proof by itself. The trusted server-side record is the source of permission. Public checker APIs do not allow self-trust. Management trust/revoke belongs to Checkin-Service and uses `ORGANIZER` or `ADMIN` through `/api/v1/management/checker/devices/**`; `CHECKER` cannot approve or revoke any device. The public `{deviceId}` path value is the external/business device id, not the internal database primary key.
 
 ### Offline Sync
 
