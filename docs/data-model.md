@@ -204,7 +204,7 @@ Rules:
 - New checker-facing registrations are pending/untrusted by default.
 - Offline package generation requires `TRUSTED`.
 - Online scan validates a provided device id, and may require one when `checkin.checker.device.required-for-online-scan=true`.
-- Public checker APIs do not allow self-trust. Device trust/revoke is owned by Checkin-Service management APIs and is allowed for `ORGANIZER` and `ADMIN`, not `CHECKER`.
+- Public checker APIs do not allow self-trust. Device trust/revoke is owned by Checkin-Service admin APIs and is allowed for `ADMIN`, `CHECKER_SUPERVISOR`, and `ORGANIZER_MANAGER`, not `CHECKER`.
 
 ### offline_package
 

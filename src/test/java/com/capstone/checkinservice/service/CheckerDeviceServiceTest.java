@@ -196,7 +196,7 @@ class CheckerDeviceServiceTest {
                 .withMessage("Device is not registered")
                 .satisfies(exception -> {
                     assertThat(exception.getResultCode()).isEqualTo(ScanResult.DEVICE_NOT_ALLOWED);
-                    assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
                 });
     }
 
@@ -212,6 +212,18 @@ class CheckerDeviceServiceTest {
         assertThat(response.getDeviceId()).isEqualTo("checker-device-b-02");
         verify(checkerDeviceRepository).findByDeviceId("checker-device-b-02");
         verify(checkerDeviceRepository, never()).findById(any(Long.class));
+    }
+
+    @Test
+    void trustDeviceDatabasePrimaryKeyStringDoesNotFallbackToFindById() {
+        when(checkerDeviceRepository.findByDeviceId("1")).thenReturn(Optional.empty());
+
+        assertThatExceptionOfType(CheckinBusinessException.class)
+                .isThrownBy(() -> service.trustDevice("1"))
+                .satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        verify(checkerDeviceRepository).findByDeviceId("1");
+        verify(checkerDeviceRepository, never()).findById(1L);
     }
 
     private CheckerDeviceRegisterRequest request() {

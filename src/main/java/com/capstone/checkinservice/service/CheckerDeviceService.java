@@ -73,7 +73,7 @@ public class CheckerDeviceService {
     @Transactional
     public CheckerDeviceResponse trustDevice(String deviceId) {
         CheckerDevice device = checkerDeviceRepository.findByDeviceId(deviceId)
-                .orElseThrow(() -> notAllowed("Device is not registered"));
+                .orElseThrow(() -> notFound("Device is not registered"));
         Instant now = clock.instant();
         device.setTrusted(true);
         device.setTrustedAt(now);
@@ -84,7 +84,7 @@ public class CheckerDeviceService {
     @Transactional
     public CheckerDeviceResponse revokeDevice(String deviceId) {
         CheckerDevice device = checkerDeviceRepository.findByDeviceId(deviceId)
-                .orElseThrow(() -> notAllowed("Device is not registered"));
+                .orElseThrow(() -> notFound("Device is not registered"));
         device.setTrusted(false);
         device.setRevokedAt(clock.instant());
         return toResponse(checkerDeviceRepository.save(device));
@@ -171,6 +171,14 @@ public class CheckerDeviceService {
         return new CheckinBusinessException(
                 ScanResult.DEVICE_NOT_ALLOWED,
                 HttpStatus.FORBIDDEN,
+                message
+        );
+    }
+
+    private CheckinBusinessException notFound(String message) {
+        return new CheckinBusinessException(
+                ScanResult.DEVICE_NOT_ALLOWED,
+                HttpStatus.NOT_FOUND,
                 message
         );
     }

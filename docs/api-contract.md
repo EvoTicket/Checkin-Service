@@ -315,7 +315,7 @@ Business notes:
 - MVP returns active assignments that are currently valid based on `validFrom` and `validUntil`.
 - If `allowedGateIds` is absent or empty, later validation treats all/default gates as allowed.
 - If `allowedGateIds` is present, later validation requires the requested `gateId` to be included.
-- Checker-facing assignment endpoints use the `CHECKER` role. Checker device approval routes use `ORGANIZER` or `ADMIN`.
+- Checker-facing assignment endpoints use the `CHECKER` role. Admin checker device approval routes use `ADMIN`, `CHECKER_SUPERVISOR`, or `ORGANIZER_MANAGER` under the current security convention.
 
 ## Checker Device Management
 
@@ -342,33 +342,39 @@ Role convention:
 - `ORGANIZER` can approve/trust and revoke checker devices for event operations.
 - `ADMIN` can approve/trust and revoke checker devices across the platform.
 
+Current admin route security convention:
+
+- `/api/v1/admin/checker/devices/**` allows `ADMIN`, `CHECKER_SUPERVISOR`, and `ORGANIZER_MANAGER`.
+- Regular `CHECKER` is denied on admin checker device routes.
+- `CHECKER_SUPERVISOR` and `ORGANIZER_MANAGER` are legacy/current security authorities for this admin API surface.
+
 MVP organizer scope assumption:
 
 - The current data model does not include organizer-event or organizer-organization ownership on `checker_device`.
-- MVP management API allows `ORGANIZER` to approve/revoke checker devices.
+- MVP admin API allows trusted management roles to approve/revoke checker devices.
 - Stricter organizer ownership and event/organization scope validation is a future hardening task.
 
-Management routes:
+Admin routes:
 
-- `GET /api/v1/management/checker/devices/pending`
-- `PATCH /api/v1/management/checker/devices/{deviceId}/trust`
-- `PATCH /api/v1/management/checker/devices/{deviceId}/revoke`
+- `GET /api/v1/admin/checker/devices/pending`
+- `PATCH /api/v1/admin/checker/devices/{deviceId}/trust`
+- `PATCH /api/v1/admin/checker/devices/{deviceId}/revoke`
 
 Checker-facing APIs do not allow self-trust or self-revocation.
 
-## GET /api/v1/management/checker/devices/pending
+## GET /api/v1/admin/checker/devices/pending
 
-Swagger tag: `Checker Device Management`
+Swagger tag: `Admin Checker Devices`
 
-Implementation status: planned controller route; repository/service support is available.
+Implementation status: implemented.
 
 Purpose:
 
-- List checker devices awaiting management approval.
+- List checker devices awaiting admin approval.
 
 Auth/role:
 
-- `ORGANIZER` or `ADMIN`.
+- `ADMIN`, `CHECKER_SUPERVISOR`, or `ORGANIZER_MANAGER`.
 - `CHECKER` is not allowed.
 
 Query semantics:
@@ -382,11 +388,11 @@ Response:
 - Response objects include external/business `deviceId`.
 - Response objects do not include database primary key `id`.
 
-## PATCH /api/v1/management/checker/devices/{deviceId}/trust
+## PATCH /api/v1/admin/checker/devices/{deviceId}/trust
 
-Swagger tag: `Checker Device Management`
+Swagger tag: `Admin Checker Devices`
 
-Implementation status: planned controller route; repository/service support is available.
+Implementation status: implemented.
 
 Purpose:
 
@@ -394,7 +400,7 @@ Purpose:
 
 Auth/role:
 
-- `ORGANIZER` or `ADMIN`.
+- `ADMIN`, `CHECKER_SUPERVISOR`, or `ORGANIZER_MANAGER`.
 - `CHECKER` is not allowed, including for their own device.
 
 Path fields:
@@ -409,13 +415,13 @@ State transition:
 
 Failure result codes:
 
-- Unknown `deviceId` returns `DEVICE_NOT_ALLOWED`.
+- Unknown `deviceId` returns HTTP 404 with `DEVICE_NOT_ALLOWED`.
 
-## PATCH /api/v1/management/checker/devices/{deviceId}/revoke
+## PATCH /api/v1/admin/checker/devices/{deviceId}/revoke
 
-Swagger tag: `Checker Device Management`
+Swagger tag: `Admin Checker Devices`
 
-Implementation status: planned controller route; repository/service support is available.
+Implementation status: implemented.
 
 Purpose:
 
@@ -423,7 +429,7 @@ Purpose:
 
 Auth/role:
 
-- `ORGANIZER` or `ADMIN`.
+- `ADMIN`, `CHECKER_SUPERVISOR`, or `ORGANIZER_MANAGER`.
 - `CHECKER` is not allowed, including for their own device.
 
 Path fields:
@@ -437,7 +443,7 @@ State transition:
 
 Failure result codes:
 
-- Unknown `deviceId` returns `DEVICE_NOT_ALLOWED`.
+- Unknown `deviceId` returns HTTP 404 with `DEVICE_NOT_ALLOWED`.
 
 ## POST /api/v1/checker/devices/register
 
