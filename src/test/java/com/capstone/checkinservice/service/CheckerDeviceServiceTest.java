@@ -19,12 +19,14 @@ import org.springframework.http.HttpStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -128,15 +130,45 @@ class CheckerDeviceServiceTest {
     }
 
     @Test
+    void listPendingDevicesReturnsPendingDeviceResponses() {
+        CheckerDevice newer = device("checker-device-b-02", 7002L, false, null);
+        CheckerDevice older = device("dev_old", 7001L, false, null);
+        older.setRegisteredAt(NOW.minusSeconds(7200));
+
+        when(checkerDeviceRepository.findByTrustedFalseAndRevokedAtIsNullOrderByRegisteredAtDesc())
+                .thenReturn(List.of(newer, older));
+
+        List<CheckerDeviceResponse> response = service.listPendingDevices();
+
+        assertThat(response)
+                .extracting(CheckerDeviceResponse::getDeviceId)
+                .containsExactly("checker-device-b-02", "dev_old");
+        assertThat(response)
+                .extracting(CheckerDeviceResponse::getStatus)
+                .containsExactly(CheckerDeviceStatus.PENDING, CheckerDeviceStatus.PENDING);
+        assertThat(response)
+                .allSatisfy(device -> {
+                    assertThat(device.isTrusted()).isFalse();
+                    assertThat(device.isRevoked()).isFalse();
+                });
+    }
+
+    @Test
     void trustDeviceMarksDeviceTrusted() {
-        CheckerDevice device = device(7001L, false, null);
+        CheckerDevice device = device(7001L, false, NOW.minusSeconds(1));
         when(checkerDeviceRepository.findByDeviceId("device-abc")).thenReturn(Optional.of(device));
         when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CheckerDeviceResponse response = service.trustDevice("device-abc");
 
         assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.TRUSTED);
+        assertThat(response.isTrusted()).isTrue();
+        assertThat(response.isRevoked()).isFalse();
         assertThat(response.getTrustedAt().toInstant()).isEqualTo(NOW);
+        assertThat(response.getRevokedAt()).isNull();
+        assertThat(device.isTrusted()).isTrue();
+        assertThat(device.getTrustedAt()).isEqualTo(NOW);
+        assertThat(device.getRevokedAt()).isNull();
     }
 
     @Test
@@ -148,7 +180,50 @@ class CheckerDeviceServiceTest {
         CheckerDeviceResponse response = service.revokeDevice("device-abc");
 
         assertThat(response.getStatus()).isEqualTo(CheckerDeviceStatus.REVOKED);
+        assertThat(response.isTrusted()).isFalse();
+        assertThat(response.isRevoked()).isTrue();
         assertThat(response.getRevokedAt().toInstant()).isEqualTo(NOW);
+        assertThat(device.isTrusted()).isFalse();
+        assertThat(device.getRevokedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void trustDeviceUnknownBusinessDeviceIdThrowsBusinessError() {
+        when(checkerDeviceRepository.findByDeviceId("missing-device")).thenReturn(Optional.empty());
+
+        assertThatExceptionOfType(CheckinBusinessException.class)
+                .isThrownBy(() -> service.trustDevice("missing-device"))
+                .withMessage("Device is not registered")
+                .satisfies(exception -> {
+                    assertThat(exception.getResultCode()).isEqualTo(ScanResult.DEVICE_NOT_ALLOWED);
+                    assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+                });
+    }
+
+    @Test
+    void trustDeviceUsesBusinessDeviceIdNotDatabaseId() {
+        CheckerDevice device = device("checker-device-b-02", 7001L, false, null);
+        device.setId(42L);
+        when(checkerDeviceRepository.findByDeviceId("checker-device-b-02")).thenReturn(Optional.of(device));
+        when(checkerDeviceRepository.save(any(CheckerDevice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CheckerDeviceResponse response = service.trustDevice("checker-device-b-02");
+
+        assertThat(response.getDeviceId()).isEqualTo("checker-device-b-02");
+        verify(checkerDeviceRepository).findByDeviceId("checker-device-b-02");
+        verify(checkerDeviceRepository, never()).findById(any(Long.class));
+    }
+
+    @Test
+    void trustDeviceDatabasePrimaryKeyStringDoesNotFallbackToFindById() {
+        when(checkerDeviceRepository.findByDeviceId("1")).thenReturn(Optional.empty());
+
+        assertThatExceptionOfType(CheckinBusinessException.class)
+                .isThrownBy(() -> service.trustDevice("1"))
+                .satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        verify(checkerDeviceRepository).findByDeviceId("1");
+        verify(checkerDeviceRepository, never()).findById(1L);
     }
 
     private CheckerDeviceRegisterRequest request() {
@@ -162,8 +237,12 @@ class CheckerDeviceServiceTest {
     }
 
     private CheckerDevice device(Long checkerId, boolean trusted, Instant revokedAt) {
+        return device("device-abc", checkerId, trusted, revokedAt);
+    }
+
+    private CheckerDevice device(String deviceId, Long checkerId, boolean trusted, Instant revokedAt) {
         return CheckerDevice.builder()
-                .deviceId("device-abc")
+                .deviceId(deviceId)
                 .checkerId(checkerId)
                 .deviceName("Old phone")
                 .platform("WEB")

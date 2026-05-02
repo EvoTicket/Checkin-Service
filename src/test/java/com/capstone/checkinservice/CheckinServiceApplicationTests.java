@@ -19,6 +19,8 @@ import org.springframework.test.context.DynamicPropertySource;
         "DB_PASSWORD=",
         "REDIS_URL=redis://localhost:6379",
         "EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/",
+        "spring.security.jwt.secret-key=bG9jYWwtZGV2LWp3dC1zZWNyZXQta2V5LWZvci1ldm90aWNrZXQtbWljcm9zZXJ2aWNlcy0xMjM0NTY3ODkw",
+        "app.seed.enabled=false",
         "eureka.client.enabled=false",
         "spring.cloud.discovery.enabled=false",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"

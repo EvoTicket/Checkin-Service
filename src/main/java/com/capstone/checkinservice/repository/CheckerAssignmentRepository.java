@@ -15,4 +15,10 @@ public interface CheckerAssignmentRepository extends JpaRepository<CheckerAssign
             Long eventId,
             Long showtimeId
     );
+
+    List<CheckerAssignment> findByCheckerIdAndEventIdAndShowtimeId(
+            Long checkerId,
+            Long eventId,
+            Long showtimeId
+    );
 }

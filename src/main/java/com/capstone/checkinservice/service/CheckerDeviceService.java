@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -61,10 +62,18 @@ public class CheckerDeviceService {
                         .build());
     }
 
+    @Transactional(readOnly = true)
+    public List<CheckerDeviceResponse> listPendingDevices() {
+        return checkerDeviceRepository.findByTrustedFalseAndRevokedAtIsNullOrderByRegisteredAtDesc()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public CheckerDeviceResponse trustDevice(String deviceId) {
         CheckerDevice device = checkerDeviceRepository.findByDeviceId(deviceId)
-                .orElseThrow(() -> notAllowed("Device is not registered"));
+                .orElseThrow(() -> notFound("Device is not registered"));
         Instant now = clock.instant();
         device.setTrusted(true);
         device.setTrustedAt(now);
@@ -75,7 +84,7 @@ public class CheckerDeviceService {
     @Transactional
     public CheckerDeviceResponse revokeDevice(String deviceId) {
         CheckerDevice device = checkerDeviceRepository.findByDeviceId(deviceId)
-                .orElseThrow(() -> notAllowed("Device is not registered"));
+                .orElseThrow(() -> notFound("Device is not registered"));
         device.setTrusted(false);
         device.setRevokedAt(clock.instant());
         return toResponse(checkerDeviceRepository.save(device));
@@ -162,6 +171,14 @@ public class CheckerDeviceService {
         return new CheckinBusinessException(
                 ScanResult.DEVICE_NOT_ALLOWED,
                 HttpStatus.FORBIDDEN,
+                message
+        );
+    }
+
+    private CheckinBusinessException notFound(String message) {
+        return new CheckinBusinessException(
+                ScanResult.DEVICE_NOT_ALLOWED,
+                HttpStatus.NOT_FOUND,
                 message
         );
     }

@@ -16,4 +16,6 @@ public interface CheckerDeviceRepository extends JpaRepository<CheckerDevice, Lo
     List<CheckerDevice> findByCheckerId(Long checkerId);
 
     List<CheckerDevice> findByCheckerIdAndTrustedTrue(Long checkerId);
+
+    List<CheckerDevice> findByTrustedFalseAndRevokedAtIsNullOrderByRegisteredAtDesc();
 }

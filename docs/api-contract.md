@@ -315,11 +315,19 @@ Business notes:
 - MVP returns active assignments that are currently valid based on `validFrom` and `validUntil`.
 - If `allowedGateIds` is absent or empty, later validation treats all/default gates as allowed.
 - If `allowedGateIds` is present, later validation requires the requested `gateId` to be included.
-- Exact IAM role names are still open.
+- Checker-facing assignment endpoints use the `CHECKER` role. Checker device approval routes use `ORGANIZER` or `ADMIN`.
 
 ## Checker Device Management
 
 Checker identity and checker device trust are separate. Authentication resolves the checker; the server-side device record decides whether a client installation is allowed to operate. Device id is not proof by itself.
+
+Device approval belongs to Checkin-Service, not IAM-Service. IAM authenticates users and supplies roles/identity claims. Checkin-Service owns the `checker_device` trust state used by scan, offline package, and offline sync flows.
+
+Device id convention:
+
+- Public API `{deviceId}` values are external/business checker device ids, for example `checker-device-b-02` or `dev_xxx`.
+- `{deviceId}` is not the database primary key.
+- The database `checker_device.id` value is internal only and must not be used or exposed as an API identifier.
 
 Device statuses:
 
@@ -327,7 +335,114 @@ Device statuses:
 - `TRUSTED`: trusted and not revoked.
 - `REVOKED`: blocked.
 
-Checker-facing APIs do not allow self-trust. Trust/revoke is future admin/organizer/internal work; current service methods support tests/seed/admin integration without exposing public self-trust.
+Role convention:
+
+- `CHECKER` can register a device and view readiness/status for their own device.
+- `CHECKER` must not approve, trust, or revoke any device, including their own device.
+- `ORGANIZER` can approve/trust and revoke checker devices for event operations.
+- `ADMIN` can approve/trust and revoke checker devices across the platform.
+
+Management route security convention:
+
+- `/api/v1/management/checker/devices/**` allows `ORGANIZER` and `ADMIN`.
+- Regular `CHECKER` is denied on management checker device routes.
+
+MVP organizer scope assumption:
+
+- The current data model does not include organizer-event or organizer-organization ownership on `checker_device`.
+- MVP management API allows `ORGANIZER` and `ADMIN` to approve/revoke checker devices.
+- Stricter organizer ownership and event/organization scope validation is a future hardening task.
+
+Management routes:
+
+- `GET /api/v1/management/checker/devices/pending`
+- `PATCH /api/v1/management/checker/devices/{deviceId}/trust`
+- `PATCH /api/v1/management/checker/devices/{deviceId}/revoke`
+
+Checker-facing APIs do not allow self-trust or self-revocation.
+
+## GET /api/v1/management/checker/devices/pending
+
+Swagger tag: `Management Checker Devices`
+
+Implementation status: implemented.
+
+Purpose:
+
+- List checker devices awaiting management approval.
+
+Auth/role:
+
+- `ORGANIZER` or `ADMIN`.
+- `CHECKER` is not allowed.
+
+Query semantics:
+
+- Pending means `trusted=false` and `revokedAt=null`.
+- Results should be ordered by `registeredAt` descending.
+
+Response:
+
+- `data` is an array of existing `CheckerDeviceResponse` objects.
+- Response objects include external/business `deviceId`.
+- Response objects do not include database primary key `id`.
+
+## PATCH /api/v1/management/checker/devices/{deviceId}/trust
+
+Swagger tag: `Management Checker Devices`
+
+Implementation status: implemented.
+
+Purpose:
+
+- Mark a checker device as trusted for checker operations.
+
+Auth/role:
+
+- `ORGANIZER` or `ADMIN`.
+- `CHECKER` is not allowed, including for their own device.
+
+Path fields:
+
+- `deviceId`: external/business checker device id, not the database primary key.
+
+State transition:
+
+- Set `trusted=true`.
+- Set `trustedAt` to current server time.
+- Set `revokedAt=null`.
+
+Failure result codes:
+
+- Unknown `deviceId` returns HTTP 404 with `DEVICE_NOT_ALLOWED`.
+
+## PATCH /api/v1/management/checker/devices/{deviceId}/revoke
+
+Swagger tag: `Management Checker Devices`
+
+Implementation status: implemented.
+
+Purpose:
+
+- Revoke a checker device so it cannot be used for trusted checker flows.
+
+Auth/role:
+
+- `ORGANIZER` or `ADMIN`.
+- `CHECKER` is not allowed, including for their own device.
+
+Path fields:
+
+- `deviceId`: external/business checker device id, not the database primary key.
+
+State transition:
+
+- Set `trusted=false`.
+- Set `revokedAt` to current server time.
+
+Failure result codes:
+
+- Unknown `deviceId` returns HTTP 404 with `DEVICE_NOT_ALLOWED`.
 
 ## POST /api/v1/checker/devices/register
 
@@ -339,7 +454,7 @@ Purpose:
 
 Auth/role:
 
-- Authenticated checker role.
+- Authenticated `CHECKER` role.
 - Checker id is resolved from the current user context.
 
 Request fields:
@@ -405,7 +520,8 @@ Business notes:
 - Device ids are generated server-side.
 - Client-provided `deviceId` is ignored for new registration.
 - New devices are `PENDING` and `trusted=false`.
-- This endpoint does not issue offline packages, trust a device, or perform admission logic.
+- This endpoint does not issue offline packages, trust/revoke a device, or perform admission logic.
+- `CHECKER` cannot use this endpoint to approve their own device.
 
 ## GET /api/v1/checker/devices/{deviceId}
 
@@ -417,12 +533,12 @@ Purpose:
 
 Auth/role:
 
-- Authenticated checker role.
+- Authenticated `CHECKER` role.
 - Device must belong to the authenticated checker if it already exists.
 
 Path fields:
 
-- `deviceId`
+- `deviceId`: external/business checker device id, not the database primary key.
 
 Response fields:
 
@@ -444,15 +560,21 @@ Success example:
 ```json
 {
   "status": 200,
-  "message": "Fetched checker device readiness successfully",
+  "message": "Fetched checker device successfully",
   "data": {
     "deviceId": "device-abc",
     "checkerId": 7001,
-    "registered": true,
+    "deviceName": "Gate phone",
+    "platform": "WEB",
+    "appVersion": "0.9.3",
+    "status": "TRUSTED",
     "trusted": true,
     "revoked": false,
-    "serverTime": "2026-05-01T10:00:00Z",
-    "message": "Device is ready."
+    "registeredAt": "2026-05-01T09:00:00Z",
+    "trustedAt": "2026-05-01T09:30:00Z",
+    "revokedAt": null,
+    "lastSeenAt": "2026-05-01T09:59:00Z",
+    "message": "Device is trusted."
   }
 }
 ```
@@ -464,7 +586,7 @@ Failure example:
   "status": 403,
   "message": "Device is registered to another checker",
   "data": {
-    "resultCode": "UNAUTHORIZED_CHECKER"
+    "resultCode": "DEVICE_NOT_ALLOWED"
   }
 }
 ```
@@ -484,7 +606,7 @@ Purpose:
 Business notes:
 
 - Returns registered/trusted/revoked facts only.
-- Does not self-trust the device.
+- Does not trust/revoke the device.
 - Another checker's device returns `DEVICE_NOT_ALLOWED`.
 
 Business notes:

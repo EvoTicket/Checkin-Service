@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -46,6 +47,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(BaseResponse.of(HttpStatus.BAD_REQUEST.value(), "Invalid request", resultMessage));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<BaseResponse<ResultMessage>> handleNotFound(NoResourceFoundException exception) {
+        ResultMessage resultMessage = ResultMessage.builder()
+                .title("Not found")
+                .message(exception.getMessage())
+                .severity("ERROR")
+                .admitAllowed(false)
+                .supportRequired(false)
+                .build();
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(BaseResponse.of(HttpStatus.NOT_FOUND.value(), "Not found", resultMessage));
     }
 
     @ExceptionHandler(Exception.class)
