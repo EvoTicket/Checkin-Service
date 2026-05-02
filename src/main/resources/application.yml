@@ -1,16 +1,37 @@
 server:
-  port: 8087
+  port: 8085
 
 spring:
   application:
     name: checkin-service
-
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+    internal:
+      secret-key: ${INTERNAL_SERVICE_SECRET_KEY}
+      token-expiration: 3600000
+      enabled: true
+      service-name: checkin-service
+  data:
+    redis:
+      url: ${REDIS_URL}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      maximum-pool-size: 10
+      minimum-idle: 5
       schema: checkin_service
 
   jpa:
@@ -21,15 +42,53 @@ spring:
         default_schema: checkin_service
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  data:
-    redis:
-      url: ${REDIS_URL}
+
+
+swagger:
+  host-url: http://localhost:${server.port}
 
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_DEFAULT_ZONE}
+      defaultZone: http://localhost:8761/eureka/
     fetch-registry: true
     register-with-eureka: true
   instance:
     prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  show-actuator: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 0.1
+  otlp:
+    tracing:
+      endpoint: http://otel-collector:4318/v1/traces
+
+logging:
+  level:
+    org:
+      hibernate:
+        SQL: debug
+        type:
+          descriptor: trace
+  pattern:
+    level: "%5p [traceId=%X{traceId}, spanId=%X{spanId}]"

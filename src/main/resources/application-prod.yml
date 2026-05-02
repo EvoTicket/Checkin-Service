@@ -1,0 +1,13 @@
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+
+spring:
+  data:
+    redis:
+      url: ${REDIS_PROD_URL}
