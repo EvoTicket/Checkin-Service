@@ -10,6 +10,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 @Data
@@ -25,11 +27,11 @@ public class ScanResultResponse {
     private Long eventId;
     private Long showtimeId;
     private String gateId;
-    private OffsetDateTime checkedInAt;
+    private Instant checkedInAt;
     private Long checkerId;
     private String message;
     private TicketSummaryResponse ticketSummary;
     private CheckInContextResponse context;
-    private OffsetDateTime firstCheckedInAt;
+    private Instant firstCheckedInAt;
     private String firstGateId;
 }

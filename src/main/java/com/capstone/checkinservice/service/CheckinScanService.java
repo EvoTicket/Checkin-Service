@@ -17,7 +17,6 @@ import com.capstone.checkinservice.enums.ScanMode;
 import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.enums.TicketAccessStatus;
 import com.capstone.checkinservice.mapper.ScanResultMessageMapper;
-import com.capstone.checkinservice.mapper.TimeMapper;
 import com.capstone.checkinservice.producer.RedisStreamProducer;
 import com.capstone.checkinservice.repository.CheckInLogRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
@@ -262,7 +261,7 @@ public class CheckinScanService {
                 .eventId(eventId)
                 .showtimeId(showtimeId)
                 .gateId(normalize(request.getGateId()))
-                .checkedInAt(TimeMapper.toOffsetDateTime(checkedInAt))
+                .checkedInAt(checkedInAt)
                 .checkerId(checkerId)
                 .message(message.getMessage())
                 .ticketSummary(toTicketSummary(ticket))
@@ -273,7 +272,7 @@ public class CheckinScanService {
                         .scannedAt(request.getScannedAt())
                         .scanMode(ScanMode.ONLINE)
                         .build())
-                .firstCheckedInAt(ticket == null ? null : TimeMapper.toOffsetDateTime(ticket.getUsedAt()))
+                .firstCheckedInAt(ticket == null ? null : ticket.getUsedAt())
                 .firstGateId(ticket == null ? null : ticket.getUsedAtGateId())
                 .build();
     }
