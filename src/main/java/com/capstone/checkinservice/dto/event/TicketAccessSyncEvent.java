@@ -1,0 +1,25 @@
+package com.capstone.checkinservice.dto.event;
+
+import com.capstone.checkinservice.enums.TicketAccessStatus;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TicketAccessSyncEvent {
+    private Long ticketAssetId;
+    private String ticketCode;
+    private Long eventId;
+    private Long showtimeId;
+    private Long currentOwnerId;
+    private TicketAccessStatus accessStatus;
+    private Integer qrVersion;
+    private String ticketTypeName;
+    private String zoneLabel;
+    private String seatLabel;
+    private String gatePolicySnapshot;
+}

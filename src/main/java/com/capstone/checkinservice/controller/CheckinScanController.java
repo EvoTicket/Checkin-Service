@@ -25,18 +25,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Checker Scan",
-        description = "APIs for online checker QR validation and atomic ticket check-in"
+        description = "Các API dành cho việc xác thực QR trực tuyến của checker và thực hiện check-in vé nguyên tử (atomic check-in)"
 )
 public class CheckinScanController {
     private final CheckinScanService checkinScanService;
 
     @PostMapping("/scan")
     @Operation(
-            summary = "Scan ticket QR online",
+            summary = "Quét mã QR vé trực tuyến",
             description = """
-                    Validates a scanned Dynamic QR token for the selected event, showtime,
-                    and optional gate, then atomically marks a valid ticket as used.
-                    Business-denied outcomes are returned as stable resultCode values.
+                    Xác thực mã QR động (Dynamic QR) được quét cho sự kiện, suất diễn đã chọn
+                    và cổng tùy chọn, sau đó đánh dấu vé hợp lệ là đã sử dụng một cách nguyên tử.
+                    Các kết quả bị từ chối do nghiệp vụ được trả về dưới dạng các giá trị resultCode ổn định.
                     """
     )
     @ApiResponses({

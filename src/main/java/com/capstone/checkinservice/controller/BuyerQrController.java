@@ -20,18 +20,18 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @Tag(
         name = "Buyer QR",
-        description = "APIs for issuing short-lived Dynamic QR tokens for ticket owners"
+        description = "Các API cấp mã QR Token động ngắn hạn cho chủ sở hữu vé"
 )
 public class BuyerQrController {
     private final BuyerQrService buyerQrService;
 
     @GetMapping("/{ticketAssetId}/qr-token")
     @Operation(
-            summary = "Issue Dynamic QR token",
+            summary = "Cấp mã QR Token động",
             description = """
-                    Issues a short-lived signed QR token for the current ticket owner.
-                    The QR token is not the ticket itself and must not be issued for USED,
-                    LOCKED_RESALE, or CANCELLED tickets.
+                    Cấp một mã QR token đã ký, có thời hạn ngắn cho chủ sở hữu vé hiện tại.
+                    Mã QR token này không phải là bản thân chiếc vé và không được cấp cho các vé đã SỬ DỤNG (USED),
+                    đang khóa để bán lại (LOCKED_RESALE), hoặc đã bị HỦY (CANCELLED).
                     """
     )
     public ResponseEntity<BaseResponse<QrTokenResponse>> issueQrToken(@PathVariable Long ticketAssetId) {

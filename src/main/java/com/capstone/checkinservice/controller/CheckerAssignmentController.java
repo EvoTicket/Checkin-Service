@@ -17,17 +17,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Checker Assignments",
-        description = "APIs for retrieving checker event, showtime, gate, and shift assignments"
+        description = "Các API truy xuất danh sách sự kiện, suất diễn, cổng và ca trực được phân công cho nhân viên kiểm soát (checker)"
 )
 public class CheckerAssignmentController {
     private final CheckerAssignmentService checkerAssignmentService;
 
     @GetMapping("/assignments")
     @Operation(
-            summary = "Get checker assignments",
+            summary = "Lấy danh sách phân công của checker",
             description = """
-                    Returns the events, showtimes, gates, and shifts assigned to the current checker.
-                    The checker must select an assignment scope before scanning tickets.
+                    Trả về các sự kiện, suất diễn, cổng và ca trực được phân công cho checker hiện tại.
+                    Checker phải chọn phạm vi phân công (assignment scope) trước khi thực hiện quét vé.
                     """
     )
     public ResponseEntity<BaseResponse<CheckerAssignmentResponse>> getAssignments() {

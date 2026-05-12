@@ -25,18 +25,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Checker Devices",
-        description = "APIs for registering and inspecting checker client devices"
+        description = "Các API để đăng ký và kiểm tra các thiết bị client của checker"
 )
 public class CheckerDeviceController {
     private final CheckerDeviceService checkerDeviceService;
 
     @PostMapping({"/register", ""})
     @Operation(
-            summary = "Register checker device",
+            summary = "Đăng ký thiết bị checker",
             description = """
-                    Registers the current checker client installation and returns a
-                    server-generated device id. Newly registered devices start as
-                    pending and are not trusted by default.
+                    Đăng ký bản cài đặt client checker hiện tại và trả về ID thiết bị do máy chủ tạo ra.
+                    Các thiết bị mới đăng ký sẽ bắt đầu ở trạng thái chờ (pending) và không được tin cậy theo mặc định.
                     """
     )
     @ApiResponses({
@@ -58,8 +57,8 @@ public class CheckerDeviceController {
 
     @GetMapping("/{deviceId}")
     @Operation(
-            summary = "Get checker device status",
-            description = "Returns current status metadata for a device owned by the authenticated checker."
+            summary = "Lấy trạng thái thiết bị checker",
+            description = "Trả về siêu dữ liệu trạng thái hiện tại của một thiết bị thuộc sở hữu của checker đã xác thực."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Device status fetched"),
@@ -78,11 +77,11 @@ public class CheckerDeviceController {
 
     @GetMapping("/{deviceId}/readiness")
     @Operation(
-            summary = "Get checker device readiness",
+            summary = "Kiểm tra mức độ sẵn sàng của thiết bị checker",
             description = """
-                    Returns readiness information for a checker device, such as whether
-                    the device is ready for camera scanning, online validation, time-sensitive
-                    QR verification, and offline fallback preparation.
+                    Trả về thông tin về mức độ sẵn sàng của thiết bị checker, chẳng hạn như thiết bị đã sẵn sàng
+                    để quét bằng camera, xác thực trực tuyến, xác minh mã QR nhạy cảm với thời gian,
+                    và chuẩn bị dự phòng ngoại tuyến hay chưa.
                     """
     )
     public ResponseEntity<BaseResponse<CheckerDeviceReadinessResponse>> getReadiness(@PathVariable String deviceId) {

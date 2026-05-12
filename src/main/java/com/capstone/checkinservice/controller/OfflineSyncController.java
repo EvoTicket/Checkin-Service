@@ -25,18 +25,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Offline Sync",
-        description = "APIs for synchronizing offline scans and classifying accepted, rejected, failed, and conflict results"
+        description = "Các API để đồng bộ hóa các lượt quét ngoại tuyến và phân loại kết quả: được chấp nhận, bị từ chối, thất bại hoặc xung đột"
 )
 public class OfflineSyncController {
     private final OfflineSyncService offlineSyncService;
 
     @PostMapping("/offline-sync")
     @Operation(
-            summary = "Sync offline scan batch",
+            summary = "Đồng bộ hóa lô quét ngoại tuyến",
             description = """
-                    Revalidates provisional offline scans after network restoration. A valid
-                    batch returns HTTP 200 with per-item SYNC_ACCEPTED, SYNC_REJECTED,
-                    SYNC_FAILED, or SYNC_CONFLICT results.
+                    Xác thực lại các lượt quét ngoại tuyến tạm thời sau khi kết nối mạng được khôi phục.
+                    Một lô hợp lệ sẽ trả về HTTP 200 với các kết quả cho từng mục: SYNC_ACCEPTED, SYNC_REJECTED,
+                    SYNC_FAILED, hoặc SYNC_CONFLICT.
                     """
     )
     @ApiResponses({

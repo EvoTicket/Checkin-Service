@@ -25,15 +25,15 @@ import java.util.List;
 @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
 @Tag(
         name = "Management Checker Devices",
-        description = "Management APIs for approving and revoking checker devices"
+        description = "Các API quản lý để phê duyệt và thu hồi thiết bị của checker"
 )
 public class ManagementCheckerDeviceController {
     private final CheckerDeviceService checkerDeviceService;
 
     @GetMapping("/pending")
     @Operation(
-            summary = "List pending checker devices",
-            description = "Returns checker devices that are untrusted and not revoked, newest registrations first."
+            summary = "Danh sách thiết bị checker đang chờ phê duyệt",
+            description = "Trả về danh sách các thiết bị checker chưa được tin cậy và chưa bị thu hồi, ưu tiên các đăng ký mới nhất."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pending checker devices fetched"),
@@ -52,8 +52,8 @@ public class ManagementCheckerDeviceController {
 
     @PatchMapping("/{deviceId}/trust")
     @Operation(
-            summary = "Trust checker device",
-            description = "Approves a checker device using its external business device id."
+            summary = "Tin cậy thiết bị checker",
+            description = "Phê duyệt một thiết bị checker bằng ID thiết bị nghiệp vụ bên ngoài."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Checker device trusted"),
@@ -73,8 +73,8 @@ public class ManagementCheckerDeviceController {
 
     @PatchMapping("/{deviceId}/revoke")
     @Operation(
-            summary = "Revoke checker device",
-            description = "Revokes a checker device using its external business device id."
+            summary = "Thu hồi thiết bị checker",
+            description = "Thu hồi một thiết bị checker bằng ID thiết bị nghiệp vụ bên ngoài."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Checker device revoked"),

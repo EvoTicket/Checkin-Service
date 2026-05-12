@@ -25,18 +25,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Offline Package",
-        description = "APIs for generating scoped offline packages for checker devices"
+        description = "Các API để tạo các gói dữ liệu ngoại tuyến (offline packages) có giới hạn phạm vi cho các thiết bị của checker"
 )
 public class OfflinePackageController {
     private final OfflinePackageService offlinePackageService;
 
     @PostMapping("/offline-packages")
     @Operation(
-            summary = "Generate offline package",
+            summary = "Tạo gói dữ liệu ngoại tuyến",
             description = """
-                    Generates a scoped offline package for a checker device. The package
-                    contains safe ticket access snapshots and QR verification metadata for
-                    provisional local validation while offline.
+                    Tạo một gói dữ liệu ngoại tuyến có giới hạn phạm vi cho một thiết bị checker.
+                    Gói này chứa các bản chụp (snapshots) truy cập vé an toàn và siêu dữ liệu xác minh mã QR
+                    để xác thực cục bộ tạm thời khi không có kết nối mạng.
                     """
     )
     @ApiResponses({

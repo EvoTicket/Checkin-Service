@@ -7,6 +7,7 @@ import com.capstone.checkinservice.crypto.exception.QrTokenException;
 import com.capstone.checkinservice.dto.common.CheckInContextResponse;
 import com.capstone.checkinservice.dto.common.ResultMessage;
 import com.capstone.checkinservice.dto.common.TicketSummaryResponse;
+import com.capstone.checkinservice.dto.event.TicketUsedEvent;
 import com.capstone.checkinservice.dto.request.OnlineScanRequest;
 import com.capstone.checkinservice.dto.response.ScanResultResponse;
 import com.capstone.checkinservice.entity.CheckInLog;
@@ -16,6 +17,8 @@ import com.capstone.checkinservice.enums.ScanMode;
 import com.capstone.checkinservice.enums.ScanResult;
 import com.capstone.checkinservice.enums.TicketAccessStatus;
 import com.capstone.checkinservice.mapper.ScanResultMessageMapper;
+import com.capstone.checkinservice.mapper.TimeMapper;
+import com.capstone.checkinservice.producer.RedisStreamProducer;
 import com.capstone.checkinservice.repository.CheckInLogRepository;
 import com.capstone.checkinservice.repository.TicketAccessStateRepository;
 import com.capstone.checkinservice.security.JwtUtil;
@@ -39,6 +42,7 @@ public class CheckinScanService {
     private final CheckerAssignmentService checkerAssignmentService;
     private final CheckerDeviceValidationService checkerDeviceValidationService;
     private final CheckerDeviceProperties checkerDeviceProperties;
+    private final RedisStreamProducer redisStreamProducer;
     private final Clock clock;
     private final JwtUtil jwtUtil;
 
@@ -97,6 +101,9 @@ public class CheckinScanService {
             ticket.setUsedByCheckerId(checkerId);
             ticket.setUsedAtGateId(normalize(request.getGateId()));
             writeLog(request, checkerId, payload, ticket, ScanResult.VALID_CHECKED_IN, scannedAt, null);
+            
+            publishTicketUsedEvent(ticket);
+            
             return response(ScanResult.VALID_CHECKED_IN, request, checkerId, payload, ticket, serverNow);
         }
 
@@ -176,6 +183,21 @@ public class CheckinScanService {
 
         String normalizedGateId = normalize(gateId);
         return normalizedGateId != null && gates.stream().anyMatch(normalizedGateId::equals);
+    }
+
+    private void publishTicketUsedEvent(TicketAccessState ticket) {
+        try {
+            TicketUsedEvent event = TicketUsedEvent.builder()
+                    .ticketAssetId(ticket.getTicketAssetId())
+                    .usedAt(ticket.getUsedAt())
+                    .usedByCheckerId(ticket.getUsedByCheckerId())
+                    .usedAtGateId(ticket.getUsedAtGateId())
+                    .build();
+            
+            redisStreamProducer.sendMessage("ticket-used", event);
+        } catch (Exception e) {
+            log.error("Failed to publish ticket-used event for assetId: {}", ticket.getTicketAssetId(), e);
+        }
     }
 
     private void writeLog(

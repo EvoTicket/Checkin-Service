@@ -72,7 +72,6 @@ public class CheckerDevice extends BaseTimeEntity {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
-    @PrePersist
     protected void ensureRegisteredAt() {
         if (registeredAt == null) {
             registeredAt = Instant.now();
